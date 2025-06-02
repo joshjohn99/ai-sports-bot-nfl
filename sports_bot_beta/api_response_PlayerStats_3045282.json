@@ -1,0 +1,661 @@
+{
+  "statistics": {
+    "splits": {
+      "id": "0",
+      "name": "All Splits",
+      "abbreviation": "Any",
+      "type": "total",
+      "categories": [
+        {
+          "name": "general",
+          "displayName": "General",
+          "shortDisplayName": "General",
+          "abbreviation": "gen",
+          "summary": "",
+          "stats": [
+            {
+              "name": "fumblesForced",
+              "displayName": "Forced Fumbles",
+              "shortDisplayName": "Forced Fumbles",
+              "description": "The total number of forced fumbles.",
+              "abbreviation": "FF",
+              "value": 6,
+              "displayValue": "6",
+              "rank": 1,
+              "rankDisplayValue": "1st"
+            },
+            {
+              "name": "fumblesRecovered",
+              "displayName": "Fumbles Recovered",
+              "shortDisplayName": "FR",
+              "description": "The number of fumbles recovered.",
+              "abbreviation": "FR",
+              "value": 2,
+              "displayValue": "2",
+              "rank": 6,
+              "rankDisplayValue": "Tied-6th"
+            },
+            {
+              "name": "fumblesRecoveredYards",
+              "displayName": "Fumbles Recovered Yards",
+              "shortDisplayName": "FRYDS",
+              "description": "The number of yards gained after a fumble is recovered.",
+              "abbreviation": "YDS",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 55,
+              "rankDisplayValue": "Tied-55th"
+            },
+            {
+              "name": "fumblesTouchdowns",
+              "displayName": "Fumbles Touchdowns",
+              "shortDisplayName": "FTD",
+              "description": "The number of times a fumbles is recovered and returned for a touchdown.",
+              "abbreviation": "FTD",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 17,
+              "rankDisplayValue": "Tied-17th"
+            },
+            {
+              "name": "gamesPlayed",
+              "displayName": "Games Played",
+              "shortDisplayName": "GP",
+              "description": "Games Played",
+              "abbreviation": "GP",
+              "value": 17,
+              "displayValue": "17",
+              "rank": 2,
+              "rankDisplayValue": "Tied-2nd"
+            },
+            {
+              "name": "defensiveFumblesTouchdowns",
+              "displayName": "Fumbles Touchdowns",
+              "shortDisplayName": "DFTD",
+              "description": "The number of times a fumbles is recovered and returned for a touchdown by the defense.",
+              "abbreviation": "DFTD",
+              "value": 0,
+              "displayValue": "0"
+            }
+          ]
+        },
+        {
+          "name": "defensive",
+          "displayName": "Defense",
+          "shortDisplayName": "Defensive",
+          "abbreviation": "def",
+          "summary": "",
+          "stats": [
+            {
+              "name": "assistTackles",
+              "displayName": "Assist Tackles",
+              "shortDisplayName": "AST",
+              "description": "The number of assists on tackles.",
+              "abbreviation": "AST",
+              "value": 21,
+              "displayValue": "21",
+              "perGameValue": 1,
+              "perGameDisplayValue": "1",
+              "rank": 214,
+              "rankDisplayValue": "Tied-214th"
+            },
+            {
+              "name": "avgInterceptionYards",
+              "displayName": "Average Interception Yards",
+              "shortDisplayName": "YDS/INT",
+              "description": "The average number of return yards per interception.",
+              "abbreviation": "AVG",
+              "value": 0,
+              "displayValue": "0.0",
+              "rank": 153,
+              "rankDisplayValue": "Tied-153rd"
+            },
+            {
+              "name": "avgSackYards",
+              "displayName": "Average Sack Yards",
+              "shortDisplayName": "YDS/SACK",
+              "description": "The average number of yards lost per sack.",
+              "abbreviation": "YDS/SACK",
+              "value": 6.913000106811523,
+              "displayValue": "6.9",
+              "perGameValue": 6.895999908447266,
+              "perGameDisplayValue": "6.896",
+              "rank": 204,
+              "rankDisplayValue": "204th"
+            },
+            {
+              "name": "avgStuffYards",
+              "displayName": "Average Stuff Yards",
+              "shortDisplayName": "YDS/STF",
+              "description": "The average number of yards lost per stuff.",
+              "abbreviation": "YDS/STF",
+              "value": 2.3329999446868896,
+              "displayValue": "2.3",
+              "rank": 224,
+              "rankDisplayValue": "Tied-224th"
+            },
+            {
+              "name": "blockedFieldGoalTouchdowns",
+              "displayName": "Block Field Goal Touchdown",
+              "shortDisplayName": "BFGTD",
+              "description": "The number of blocked field goals that were returned for a touchdown.",
+              "abbreviation": "BFGTD",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 4,
+              "rankDisplayValue": "Tied-4th"
+            },
+            {
+              "name": "blockedPuntTouchdowns",
+              "displayName": "Blocked Punt Touchdowns",
+              "shortDisplayName": "BPTD",
+              "description": "The number of blocked punts that were returned for touchdowns.",
+              "abbreviation": "BPTD",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 4,
+              "rankDisplayValue": "Tied-4th"
+            },
+            {
+              "name": "hurries",
+              "displayName": "Hurries",
+              "shortDisplayName": "HUR",
+              "description": "The number of times that the quarterback is hurried.",
+              "abbreviation": "HUR",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 1,
+              "rankDisplayValue": "Tied-1st"
+            },
+            {
+              "name": "kicksBlocked",
+              "displayName": "Kicks Blocked",
+              "shortDisplayName": "KBLK",
+              "description": "The number of times a kick was blocked.",
+              "abbreviation": "KB",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 39,
+              "rankDisplayValue": "Tied-39th"
+            },
+            {
+              "name": "longInterception",
+              "displayName": "Long Interception",
+              "shortDisplayName": "LNGINT",
+              "description": "The amount of yards of the longest interception return.",
+              "abbreviation": "LNG",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 154,
+              "rankDisplayValue": "Tied-154th"
+            },
+            {
+              "name": "miscTouchdowns",
+              "displayName": "Miscellaneous Touchdowns",
+              "shortDisplayName": "MISCTD",
+              "description": "The number of miscellaneous touchdowns.",
+              "abbreviation": "MISCTD",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 5,
+              "rankDisplayValue": "Tied-5th"
+            },
+            {
+              "name": "passesBattedDown",
+              "displayName": "Passes Batted Down",
+              "shortDisplayName": "BATD",
+              "description": "The number of passes that were batted down.",
+              "abbreviation": "BATD",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 1,
+              "rankDisplayValue": "Tied-1st"
+            },
+            {
+              "name": "passesDefended",
+              "displayName": "Passes Defended",
+              "shortDisplayName": "Passes Defended",
+              "description": "The total number of passes defended.",
+              "abbreviation": "PD",
+              "value": 4,
+              "displayValue": "4",
+              "rank": 194,
+              "rankDisplayValue": "Tied-194th"
+            },
+            {
+              "name": "QBHits",
+              "displayName": "Quarterback Hits",
+              "shortDisplayName": "QB HTS",
+              "description": "The times the quarterback is hit.",
+              "abbreviation": "QB HTS",
+              "value": 27,
+              "displayValue": "27",
+              "perGameValue": 1,
+              "perGameDisplayValue": "1",
+              "rank": 6,
+              "rankDisplayValue": "6th"
+            },
+            {
+              "name": "twoPtReturns",
+              "displayName": "Two Point Returns",
+              "shortDisplayName": "2PTR",
+              "description": "The number of two point attempts that is returned by the defense.",
+              "abbreviation": "2PTR",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 2,
+              "rankDisplayValue": "Tied-2nd"
+            },
+            {
+              "name": "sacks",
+              "displayName": "Sacks",
+              "shortDisplayName": "Sacks",
+              "description": "The total number of sacks.",
+              "abbreviation": "SACK",
+              "value": 11.5,
+              "displayValue": "11.5",
+              "perGameValue": 0.718999981880188,
+              "perGameDisplayValue": "0.719",
+              "rank": 8,
+              "rankDisplayValue": "Tied-8th"
+            },
+            {
+              "name": "sackYards",
+              "displayName": "Sack Yards",
+              "shortDisplayName": "SCKYDS",
+              "description": "The number of yards lost from sacks.",
+              "abbreviation": "SCKYDS",
+              "value": 79.5,
+              "displayValue": "80",
+              "perGameValue": 4.968999862670898,
+              "perGameDisplayValue": "4.969",
+              "rank": 11,
+              "rankDisplayValue": "11th"
+            },
+            {
+              "name": "safeties",
+              "displayName": "Safeties",
+              "shortDisplayName": "SAFE",
+              "description": "The number of times the offense is tackled in their own endzone.",
+              "abbreviation": "SAFE",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 6,
+              "rankDisplayValue": "Tied-6th"
+            },
+            {
+              "name": "soloTackles",
+              "displayName": "Solo Tackles",
+              "shortDisplayName": "SOLO",
+              "description": "The number of times a tackle was made unassisted.",
+              "abbreviation": "SOLO",
+              "value": 40,
+              "displayValue": "40",
+              "perGameValue": 2,
+              "perGameDisplayValue": "2",
+              "rank": 172,
+              "rankDisplayValue": "Tied-172nd"
+            },
+            {
+              "name": "stuffs",
+              "displayName": "Stuffs",
+              "shortDisplayName": "STF",
+              "description": "The number of times that a runner is stuffed at or behind the line of scrimmage.",
+              "abbreviation": "STF",
+              "value": 14.5,
+              "displayValue": "14.5",
+              "perGameValue": 1,
+              "perGameDisplayValue": "1",
+              "rank": 11,
+              "rankDisplayValue": "11th"
+            },
+            {
+              "name": "stuffYards",
+              "displayName": "Stuff Yards",
+              "shortDisplayName": "STFYDS",
+              "description": "The number of yards lost from stuffs.",
+              "abbreviation": "STFYDS",
+              "value": 21,
+              "displayValue": "21",
+              "rank": 15,
+              "rankDisplayValue": "Tied-15th"
+            },
+            {
+              "name": "tacklesForLoss",
+              "displayName": "Tackles For Loss",
+              "shortDisplayName": "TFL",
+              "description": "The number of tackles that result in a loss of yardage.",
+              "abbreviation": "TFL",
+              "value": 19,
+              "displayValue": "19",
+              "perGameValue": 1.187999963760376,
+              "perGameDisplayValue": "1.188",
+              "rank": 2,
+              "rankDisplayValue": "Tied-2nd"
+            },
+            {
+              "name": "tacklesYardsLost",
+              "displayName": "Tackles Yards Lost",
+              "shortDisplayName": "TYDSL",
+              "description": "The number of yards lost from tackles for lost.",
+              "abbreviation": "CMP",
+              "value": 36,
+              "displayValue": "36",
+              "rank": 18,
+              "rankDisplayValue": "Tied-18th"
+            },
+            {
+              "name": "teamGamesPlayed",
+              "displayName": "Team Games Played",
+              "shortDisplayName": "GP",
+              "description": "The numbers of team games played.",
+              "abbreviation": "GP",
+              "value": 17,
+              "displayValue": "17",
+              "rank": 13,
+              "rankDisplayValue": "Tied-13th"
+            },
+            {
+              "name": "totalTackles",
+              "displayName": "Total Tackles",
+              "shortDisplayName": "Tackles",
+              "description": "The total number of tackles.",
+              "abbreviation": "TOT",
+              "value": 61,
+              "displayValue": "61",
+              "perGameValue": 2,
+              "perGameDisplayValue": "2",
+              "rank": 179,
+              "rankDisplayValue": "Tied-179th"
+            },
+            {
+              "name": "yardsAllowed",
+              "displayName": "Yards Allowed",
+              "shortDisplayName": "YA",
+              "description": "Yards allowed",
+              "abbreviation": "YA",
+              "value": 0,
+              "displayValue": "0"
+            },
+            {
+              "name": "pointsAllowed",
+              "displayName": "Points Allowed",
+              "shortDisplayName": "PA",
+              "description": "Points allowed",
+              "abbreviation": "PA",
+              "value": 0,
+              "displayValue": "0"
+            },
+            {
+              "name": "onePtSafetiesMade",
+              "displayName": "One Point Safeties Made",
+              "shortDisplayName": "OPSM",
+              "description": "One Point Safeties Made",
+              "abbreviation": "OPSM",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 1,
+              "rankDisplayValue": "Tied-1st"
+            },
+            {
+              "name": "missedFieldGoalReturnTd",
+              "displayName": "Missed Field Goal Return TD",
+              "shortDisplayName": "MFGRTD",
+              "description": "The number of Missed Field Goal Return TD.",
+              "abbreviation": "MFGRTD",
+              "value": 0,
+              "displayValue": "0"
+            },
+            {
+              "name": "blockedPuntEzRecTd",
+              "displayName": "Blocked Punt Ez Rec TD",
+              "shortDisplayName": "BPERTD",
+              "description": "The number of Blocked Punt EZ Rec TD",
+              "abbreviation": "BPERTD",
+              "value": 0,
+              "displayValue": "0"
+            }
+          ]
+        },
+        {
+          "name": "defensiveInterceptions",
+          "displayName": "Defensive Interceptions",
+          "shortDisplayName": "Defensive Interceptions",
+          "abbreviation": "defint",
+          "summary": "",
+          "stats": [
+            {
+              "name": "interceptions",
+              "displayName": "Interceptions",
+              "shortDisplayName": "Interceptions",
+              "description": "The total number of interceptions.",
+              "abbreviation": "INT",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 227,
+              "rankDisplayValue": "Tied-227th"
+            },
+            {
+              "name": "interceptionTouchdowns",
+              "displayName": "Interception Touchdowns",
+              "shortDisplayName": "INTTD",
+              "description": "The number of times an interception is returned for a touchdown.",
+              "abbreviation": "TD",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 28,
+              "rankDisplayValue": "Tied-28th"
+            },
+            {
+              "name": "interceptionYards",
+              "displayName": "Interception Yards",
+              "shortDisplayName": "INTYDS",
+              "description": "The number of yards gained after an interception.",
+              "abbreviation": "YDS",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 154,
+              "rankDisplayValue": "Tied-154th"
+            }
+          ]
+        },
+        {
+          "name": "scoring",
+          "displayName": "Scoring",
+          "shortDisplayName": "Scoring",
+          "abbreviation": "s",
+          "summary": "",
+          "stats": [
+            {
+              "name": "defensivePoints",
+              "displayName": "Defensive Points",
+              "shortDisplayName": "DP",
+              "description": "The number of points scored on defense.",
+              "abbreviation": "DP",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 6,
+              "rankDisplayValue": "Tied-6th"
+            },
+            {
+              "name": "fieldGoals",
+              "displayName": "Field Goals",
+              "shortDisplayName": "FG",
+              "description": "The number of field goals made.",
+              "abbreviation": "FG",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 45,
+              "rankDisplayValue": "Tied-45th"
+            },
+            {
+              "name": "kickExtraPoints",
+              "displayName": "Kick Extra Points",
+              "shortDisplayName": "XP",
+              "description": "The number of extra points made.",
+              "abbreviation": "PAT",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 44,
+              "rankDisplayValue": "Tied-44th"
+            },
+            {
+              "name": "kickExtraPointsMade",
+              "displayName": "Kick Extra Points Made",
+              "shortDisplayName": "XPM",
+              "description": "The number of extra points made.",
+              "abbreviation": "XPM",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 44,
+              "rankDisplayValue": "Tied-44th"
+            },
+            {
+              "name": "miscPoints",
+              "displayName": "Miscellaneous Points",
+              "shortDisplayName": "MISP",
+              "description": "The number of miscellaneous points scored.",
+              "abbreviation": "MISP",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 5,
+              "rankDisplayValue": "Tied-5th"
+            },
+            {
+              "name": "passingTouchdowns",
+              "displayName": "Passing Touchdowns",
+              "shortDisplayName": "Touchdowns",
+              "description": "The total number of passing touchdowns.",
+              "abbreviation": "PASS",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 64,
+              "rankDisplayValue": "Tied-64th"
+            },
+            {
+              "name": "receivingTouchdowns",
+              "displayName": "Receiving Touchdowns",
+              "shortDisplayName": "RECTD",
+              "description": "The total number of receiving touchdowns.",
+              "abbreviation": "REC",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 258,
+              "rankDisplayValue": "Tied-258th"
+            },
+            {
+              "name": "returnTouchdowns",
+              "displayName": "Return Touchdowns",
+              "shortDisplayName": "RETTD",
+              "description": "The total number of return touchdowns.",
+              "abbreviation": "RET",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 25,
+              "rankDisplayValue": "Tied-25th"
+            },
+            {
+              "name": "rushingTouchdowns",
+              "displayName": "Rushing Touchdowns",
+              "shortDisplayName": "RUSTD",
+              "description": "The total number of rushing touchdowns.",
+              "abbreviation": "RUSH",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 135,
+              "rankDisplayValue": "Tied-135th"
+            },
+            {
+              "name": "totalPoints",
+              "displayName": "Total Points",
+              "shortDisplayName": "TP",
+              "description": "The number of total points scored.",
+              "abbreviation": "PTS",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 396,
+              "rankDisplayValue": "Tied-396th"
+            },
+            {
+              "name": "totalPointsPerGame",
+              "displayName": "Total Points Per Game",
+              "shortDisplayName": "TP/G",
+              "description": "The number of points scored per game.",
+              "abbreviation": "TP/G",
+              "value": 0,
+              "displayValue": "0.0",
+              "rank": 396,
+              "rankDisplayValue": "Tied-396th"
+            },
+            {
+              "name": "totalTouchdowns",
+              "displayName": "Total Touchdowns",
+              "shortDisplayName": "TTD",
+              "description": "The number of touchdowns scored in total.",
+              "abbreviation": "TD",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 352,
+              "rankDisplayValue": "Tied-352nd"
+            },
+            {
+              "name": "totalTwoPointConvs",
+              "displayName": "Total Two Point Conversions",
+              "shortDisplayName": "2PTC",
+              "description": "The number of times a 2-point conversion is successful.",
+              "abbreviation": "2PT",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 45,
+              "rankDisplayValue": "Tied-45th"
+            },
+            {
+              "name": "twoPointPassConvs",
+              "displayName": "Two Point Pass Conversions",
+              "shortDisplayName": "2PTPC",
+              "description": "The number of times a 2-point conversion is successful with a pass.",
+              "abbreviation": "2PTPC",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 23,
+              "rankDisplayValue": "Tied-23rd"
+            },
+            {
+              "name": "twoPointRecConvs",
+              "displayName": "Two Point Receiving Conversion",
+              "shortDisplayName": "2PTRCC",
+              "description": "The number of times a 2-point is converted with a reception.",
+              "abbreviation": "2PTRCC",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 31,
+              "rankDisplayValue": "Tied-31st"
+            },
+            {
+              "name": "twoPointRushConvs",
+              "displayName": "Two Point Rush Conversion",
+              "shortDisplayName": "2PTRUC",
+              "description": "The number of times a 2-point is converted with a run.",
+              "abbreviation": "2PTRUC",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 15,
+              "rankDisplayValue": "Tied-15th"
+            },
+            {
+              "name": "onePtSafetiesMade",
+              "displayName": "One Point Safeties Made",
+              "shortDisplayName": "OPSM",
+              "description": "One Point Safeties Made",
+              "abbreviation": "OPSM",
+              "value": 0,
+              "displayValue": "0",
+              "rank": 1,
+              "rankDisplayValue": "Tied-1st"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
