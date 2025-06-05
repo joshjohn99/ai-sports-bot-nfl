@@ -1,5 +1,5 @@
 # stat_retriever_agent.py
-from api_config import api_config
+from ..config.api_config import api_config
 import requests
 import json
 from datetime import datetime

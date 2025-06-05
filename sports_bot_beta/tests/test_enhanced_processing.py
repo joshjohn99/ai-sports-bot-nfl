@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
-Test Enhanced Processing System with Real Queries
+Test Enhanced Processing Functions
 """
 
 import asyncio
-from sports_agents import run_query_planner, run_enhanced_query_processor, format_enhanced_response
+import sys
+sys.path.append('../src')  # Add src to path
+
+from src.sports_bot.core.sports_agents import (
+    run_query_planner, 
+    run_enhanced_query_processor, 
+    format_enhanced_response
+)
 
 async def test_enhanced_processing():
     print('🧪 Testing Enhanced Processing with Real Query...')

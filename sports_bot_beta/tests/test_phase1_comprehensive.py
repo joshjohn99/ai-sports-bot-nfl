@@ -6,14 +6,17 @@ Tests all key features and improvements of the enhanced architecture.
 
 import asyncio
 import sys
-from sports_agents import (
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))  # Add src to path
+
+from sports_bot.core.sports_agents import (
     run_query_planner, 
     run_enhanced_query_processor, 
     format_enhanced_response,
     QueryContext
 )
-from query_types import QueryType, QueryClassifier
-from response_formatter import ResponseFormatter, EdgeCaseHandler
+from sports_bot.core.query_types import QueryType, QueryClassifier
+from sports_bot.core.response_formatter import ResponseFormatter, EdgeCaseHandler
 
 async def test_single_player_query():
     """Test basic single player stat query."""

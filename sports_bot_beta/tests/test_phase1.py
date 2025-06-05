@@ -4,6 +4,14 @@ Test Phase 1 Architecture Integration
 Testing query classification and basic functionality.
 """
 
+import asyncio
+import sys
+sys.path.append('../src')  # Add src to path
+
+from src.sports_bot.core.sports_agents import run_query_planner, QueryContext
+from src.sports_bot.config.api_config import api_config
+from src.sports_bot.core.stat_retriever import StatRetrieverApiAgent
+
 print('Testing Phase 1 Architecture Integration...')
 print()
 

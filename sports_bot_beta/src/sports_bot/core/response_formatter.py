@@ -1,10 +1,10 @@
 """
-Response Formatting for Different Query Types
-Generates user-friendly responses based on query results and handles edge cases.
+Response Formatter Module
+Handles formatting of query results into user-friendly responses.
 """
 
 from typing import Dict, Any, List
-from query_types import QueryType
+from .query_types import QueryType
 
 class ResponseFormatter:
     """Formats query results into user-friendly responses."""

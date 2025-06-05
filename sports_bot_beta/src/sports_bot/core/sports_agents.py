@@ -12,14 +12,14 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, ValidationError
 import uuid
 import json
-from debate_agent import LLMDebateAgent  # adjust path if needed
-from api_config import api_config
-from debate_integration import DebateEngine, integrate_queryplanner_to_debate
-from stat_retriever import StatRetrieverApiAgent
+from ..agents.debate_agent import LLMDebateAgent  # adjust path if needed
+from ..config.api_config import api_config
+from ..agents.debate_integration import DebateEngine, integrate_queryplanner_to_debate
+from .stat_retriever import StatRetrieverApiAgent
 
 # Import new architecture components
-from query_types import QueryType, QueryPlan, QueryClassifier, QueryExecutor
-from response_formatter import ResponseFormatter, EdgeCaseHandler
+from .query_types import QueryType, QueryPlan, QueryClassifier, QueryExecutor
+from .response_formatter import ResponseFormatter, EdgeCaseHandler
 
 llm_agent = LLMDebateAgent()
 
@@ -539,8 +539,9 @@ def format_enhanced_response(query_results: Dict[str, Any]) -> str:
 # Configuration for Phase 1 integration
 USE_ENHANCED_PROCESSOR = True  # Toggle between legacy and enhanced processing
 
-if __name__ == "__main__":
-    print("Sports Agent CLI - Main Block Running")
+def main():
+    """Main function for running the AI Sports Bot CLI."""
+    print("Sports Agent CLI - Main Function Running")
     print(f"🚀 Enhanced Processing: {'ENABLED' if USE_ENHANCED_PROCESSOR else 'DISABLED'}")
     print("Type your sports question (or 'exit' to quit):")
     # Initialize debate_result with a default structure or None
@@ -707,5 +708,8 @@ if __name__ == "__main__":
         )
         print("\n🔥 Dynamic Debate Output (LLM):")
         print(dynamic_debate)
+
+if __name__ == "__main__":
+    main()
 else:
     print("Sports Agent CLI - Script imported. Main execution block (__name__ == '__main__') skipped.") 
