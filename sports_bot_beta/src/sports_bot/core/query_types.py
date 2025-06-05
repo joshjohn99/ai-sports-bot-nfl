@@ -408,11 +408,118 @@ class QueryExecutor:
     
     async def _execute_season_comparison(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
         """Execute season comparison query for a single player across multiple seasons."""
-        return {"error": "Season comparisons require additional API endpoints not yet implemented"}
+        print(f"[DEBUG] _execute_season_comparison called with seasons: {query_context.season_years}")
+        
+        if not plan.primary_players and not query_context.player_names:
+            return {"error": "No player specified for season comparison"}
+        
+        player_name = plan.primary_players[0] if plan.primary_players else query_context.player_names[0]
+        seasons = query_context.season_years
+        
+        if len(seasons) < 2:
+            return {"error": f"Need at least 2 seasons for comparison. Found: {seasons}"}
+        
+        season_stats = {}
+        errors = {}
+        
+        # Fetch stats for each season
+        for season in seasons:
+            print(f"[DEBUG] Fetching stats for {player_name} in season {season}")
+            try:
+                season_query_context = query_context.model_copy()
+                season_query_context.season = str(season)
+                season_query_context.season_years = [season]
+                
+                # Use StatRetriever's season-aware functionality
+                player_stats = self.stat_agent.fetch_stats_for_season(season_query_context, season)
+                
+                if isinstance(player_stats, dict) and "error" in player_stats:
+                    errors[str(season)] = player_stats["error"]
+                    print(f"[DEBUG] Error fetching stats for {player_name} in {season}: {player_stats['error']}")
+                else:
+                    season_stats[str(season)] = player_stats
+                    print(f"[DEBUG] Successfully fetched stats for {player_name} in {season}")
+                    
+            except Exception as e:
+                errors[str(season)] = str(e)
+                print(f"[DEBUG] Exception fetching stats for {player_name} in {season}: {e}")
+        
+        if not season_stats:
+            return {
+                "error": "Could not retrieve stats for any seasons",
+                "individual_errors": errors,
+                "seasons_attempted": seasons
+            }
+        
+        # Compare the season stats
+        comparison_results = self._compare_season_stats(season_stats, plan.metrics, player_name)
+        
+        return {
+            "query_type": plan.query_type.value,
+            "player": player_name,
+            "seasons": seasons,
+            "individual_stats": season_stats,
+            "comparison": comparison_results,
+            "errors": errors if errors else None,
+            "response_format": plan.response_format
+        }
     
     async def _execute_multi_season_comparison(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
         """Execute multi-season comparison query for a single player across 3+ seasons."""
-        return {"error": "Multi-season comparisons require additional API endpoints not yet implemented"}
+        print(f"[DEBUG] _execute_multi_season_comparison called with seasons: {query_context.season_years}")
+        
+        if not plan.primary_players and not query_context.player_names:
+            return {"error": "No player specified for multi-season comparison"}
+        
+        player_name = plan.primary_players[0] if plan.primary_players else query_context.player_names[0]
+        seasons = query_context.season_years
+        
+        if len(seasons) < 3:
+            return {"error": f"Need at least 3 seasons for multi-season comparison. Found: {seasons}"}
+        
+        season_stats = {}
+        errors = {}
+        
+        # Batch fetch stats for all seasons
+        for season in seasons:
+            print(f"[DEBUG] Fetching stats for {player_name} in season {season}")
+            try:
+                season_query_context = query_context.model_copy()
+                season_query_context.season = str(season)
+                season_query_context.season_years = [season]
+                
+                player_stats = self.stat_agent.fetch_stats_for_season(season_query_context, season)
+                
+                if isinstance(player_stats, dict) and "error" in player_stats:
+                    errors[str(season)] = player_stats["error"]
+                    print(f"[DEBUG] Error fetching stats for {player_name} in {season}: {player_stats['error']}")
+                else:
+                    season_stats[str(season)] = player_stats
+                    print(f"[DEBUG] Successfully fetched stats for {player_name} in {season}")
+                    
+            except Exception as e:
+                errors[str(season)] = str(e)
+                print(f"[DEBUG] Exception fetching stats for {player_name} in {season}: {e}")
+        
+        if not season_stats:
+            return {
+                "error": "Could not retrieve stats for any seasons",
+                "individual_errors": errors,
+                "seasons_attempted": seasons
+            }
+        
+        # Perform n-way season comparison and trend analysis
+        comparison_results = self._perform_n_way_season_comparison(season_stats, plan.metrics, player_name)
+        
+        return {
+            "query_type": plan.query_type.value,
+            "player": player_name,
+            "seasons": seasons,
+            "individual_stats": season_stats,
+            "comparison": comparison_results,
+            "errors": errors if errors else None,
+            "response_format": plan.response_format
+        }
 
     async def _execute_league_leaders(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
         """Execute league leaders query - this would need additional API endpoints."""
@@ -469,6 +576,129 @@ class QueryExecutor:
             comparison["overall_rankings"] = [
                 {"rank": i+1, "player": player, "score": score}
                 for i, (player, score) in enumerate(overall_rankings)
+            ]
+        
+        return comparison
+    
+    def _compare_season_stats(self, season_stats: Dict[str, Any], metrics: List[str], player_name: str) -> Dict[str, Any]:
+        """Compare stats between seasons for a single player."""
+        comparison = {
+            "best_season_by_metric": {},
+            "season_differences": {},
+            "trends": {},
+            "summary": f"Season comparison for {player_name}"
+        }
+        
+        for metric in metrics:
+            season_values = {}
+            for season, stats in season_stats.items():
+                if isinstance(stats, dict) and 'simple_stats' in stats:
+                    value = stats['simple_stats'].get(metric, 0)
+                    if isinstance(value, (int, float)):
+                        season_values[season] = value
+            
+            if season_values:
+                best_season = max(season_values, key=season_values.get)
+                worst_season = min(season_values, key=season_values.get)
+                
+                comparison["best_season_by_metric"][metric] = {
+                    "best_season": best_season,
+                    "best_value": season_values[best_season],
+                    "worst_season": worst_season,
+                    "worst_value": season_values[worst_season],
+                    "all_values": season_values,
+                    "improvement": season_values[best_season] - season_values[worst_season]
+                }
+                
+                # Calculate trend (simple linear trend)
+                seasons_ordered = sorted(season_values.keys())
+                if len(seasons_ordered) >= 2:
+                    first_season_value = season_values[seasons_ordered[0]]
+                    last_season_value = season_values[seasons_ordered[-1]]
+                    trend = "increasing" if last_season_value > first_season_value else "decreasing"
+                    comparison["trends"][metric] = {
+                        "direction": trend,
+                        "change": last_season_value - first_season_value,
+                        "percentage_change": ((last_season_value - first_season_value) / first_season_value * 100) if first_season_value > 0 else 0
+                    }
+        
+        return comparison
+    
+    def _perform_n_way_season_comparison(self, season_stats: Dict[str, Any], metrics: List[str], player_name: str) -> Dict[str, Any]:
+        """Perform n-way comparison between multiple seasons for a single player."""
+        comparison = {
+            "best_season_by_metric": {},
+            "rankings_by_metric": {},
+            "trends": {},
+            "career_progression": {},
+            "summary": f"Multi-season analysis for {player_name}",
+            "overall_rankings": {}
+        }
+        
+        for metric in metrics:
+            season_values = {}
+            for season, stats in season_stats.items():
+                if isinstance(stats, dict) and 'simple_stats' in stats:
+                    value = stats['simple_stats'].get(metric, 0)
+                    if isinstance(value, (int, float)):
+                        season_values[season] = value
+            
+            if season_values:
+                # Sort seasons by metric value (descending)
+                ranked_seasons = sorted(season_values.items(), key=lambda x: x[1], reverse=True)
+                
+                comparison["best_season_by_metric"][metric] = {
+                    "best_season": ranked_seasons[0][0],
+                    "best_value": ranked_seasons[0][1],
+                    "worst_season": ranked_seasons[-1][0],
+                    "worst_value": ranked_seasons[-1][1],
+                    "all_values": season_values
+                }
+                
+                comparison["rankings_by_metric"][metric] = [
+                    {"rank": i+1, "season": season, "value": value} 
+                    for i, (season, value) in enumerate(ranked_seasons)
+                ]
+                
+                # Calculate career progression
+                seasons_ordered = sorted(season_values.keys())
+                progression = []
+                for i, season in enumerate(seasons_ordered):
+                    if i > 0:
+                        prev_value = season_values[seasons_ordered[i-1]]
+                        curr_value = season_values[season]
+                        change = curr_value - prev_value
+                        progression.append({
+                            "from_season": seasons_ordered[i-1],
+                            "to_season": season,
+                            "change": change,
+                            "trend": "improved" if change > 0 else "declined" if change < 0 else "stable"
+                        })
+                
+                comparison["career_progression"][metric] = progression
+        
+        # Calculate overall season rankings across all metrics
+        if comparison["best_season_by_metric"]:
+            overall_scores = {}
+            all_seasons = set()
+            for season_data in season_stats.keys():
+                all_seasons.add(season_data)
+            
+            for season in all_seasons:
+                score = 0
+                for metric_data in comparison["rankings_by_metric"].values():
+                    for ranking in metric_data:
+                        if ranking["season"] == season:
+                            # Lower rank number = higher score
+                            score += (len(all_seasons) - ranking["rank"] + 1)
+                            break
+                overall_scores[season] = score
+            
+            # Sort by overall score
+            overall_rankings = sorted(overall_scores.items(), key=lambda x: x[1], reverse=True)
+            comparison["overall_rankings"] = [
+                {"rank": i+1, "season": season, "score": score}
+                for i, (season, score) in enumerate(overall_rankings)
             ]
         
         return comparison

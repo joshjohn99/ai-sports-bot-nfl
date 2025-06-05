@@ -183,14 +183,132 @@ class ResponseFormatter:
         """Format season comparison response."""
         if "error" in results:
             return f"❌ {results['error']}"
-        return "📅 Season comparison functionality coming soon!"
+        
+        player = results.get("player")
+        seasons = results.get("seasons", [])
+        comparison = results.get("comparison", {})
+        individual_stats = results.get("individual_stats", {})
+        
+        if not player or len(seasons) < 2:
+            return "❌ Need player and at least 2 seasons for comparison"
+        
+        response_parts = [f"📅 **{player}** Season Comparison: {' vs '.join(map(str, seasons))}"]
+        response_parts.append("=" * 60)
+        
+        best_season_by_metric = comparison.get("best_season_by_metric", {})
+        trends = comparison.get("trends", {})
+        
+        # Show best season for each metric
+        for metric, metric_data in best_season_by_metric.items():
+            best_season = metric_data.get("best_season")
+            best_value = metric_data.get("best_value")
+            worst_season = metric_data.get("worst_season")
+            worst_value = metric_data.get("worst_value")
+            all_values = metric_data.get("all_values", {})
+            
+            response_parts.append(f"**{metric.upper()}:**")
+            
+            # Show values for each season
+            for season in sorted(seasons, key=str):
+                value = all_values.get(str(season), "N/A")
+                if str(season) == best_season:
+                    response_parts.append(f"• 🏆 **{season}**: {value} (Best)")
+                elif str(season) == worst_season:
+                    response_parts.append(f"• 📉 **{season}**: {value} (Lowest)")
+                else:
+                    response_parts.append(f"• **{season}**: {value}")
+            
+            # Show trend if available
+            if metric in trends:
+                trend_data = trends[metric]
+                direction = trend_data.get("direction", "")
+                change = trend_data.get("change", 0)
+                if direction == "increasing":
+                    response_parts.append(f"  📈 **Trend**: {direction.title()} (+{change})")
+                elif direction == "decreasing":
+                    response_parts.append(f"  📉 **Trend**: {direction.title()} ({change})")
+                else:
+                    response_parts.append(f"  ➡️ **Trend**: Stable")
+            
+            response_parts.append("")
+        
+        return "\n".join(response_parts)
     
     @staticmethod
     def _format_multi_season_comparison(results: Dict[str, Any]) -> str:
         """Format multi-season comparison response."""
         if "error" in results:
             return f"❌ {results['error']}"
-        return "📅 Multi-season comparison functionality coming soon!"
+        
+        player = results.get("player")
+        seasons = results.get("seasons", [])
+        comparison = results.get("comparison", {})
+        individual_stats = results.get("individual_stats", {})
+        
+        if not player or len(seasons) < 3:
+            return "❌ Need player and at least 3 seasons for multi-season comparison"
+        
+        response_parts = [f"📈 **{player}** Career Analysis: {' vs '.join(map(str, seasons))}"]
+        response_parts.append("=" * 70)
+        
+        rankings_by_metric = comparison.get("rankings_by_metric", {})
+        career_progression = comparison.get("career_progression", {})
+        overall_rankings = comparison.get("overall_rankings", [])
+        
+        # Show rankings for each metric across all seasons
+        for metric, rankings in rankings_by_metric.items():
+            response_parts.append(f"**{metric.upper()} RANKINGS:**")
+            for ranking in rankings:
+                rank = ranking["rank"]
+                season = ranking["season"]
+                value = ranking["value"]
+                
+                if rank == 1:
+                    response_parts.append(f"🥇 **{rank}. {season}**: {value}")
+                elif rank == 2:
+                    response_parts.append(f"🥈 **{rank}. {season}**: {value}")
+                elif rank == 3:
+                    response_parts.append(f"🥉 **{rank}. {season}**: {value}")
+                else:
+                    response_parts.append(f"   **{rank}. {season}**: {value}")
+            
+            # Show career progression for this metric
+            if metric in career_progression:
+                progression = career_progression[metric]
+                response_parts.append("  **Year-over-Year Changes:**")
+                for change in progression:
+                    from_season = change["from_season"]
+                    to_season = change["to_season"]
+                    change_value = change["change"]
+                    trend = change["trend"]
+                    
+                    if trend == "improved":
+                        response_parts.append(f"    📈 {from_season} → {to_season}: +{change_value}")
+                    elif trend == "declined":
+                        response_parts.append(f"    📉 {from_season} → {to_season}: {change_value}")
+                    else:
+                        response_parts.append(f"    ➡️ {from_season} → {to_season}: No change")
+            
+            response_parts.append("")
+        
+        # Show overall season rankings
+        if overall_rankings:
+            response_parts.append("🎯 **OVERALL SEASON RANKINGS** (across all metrics):")
+            for ranking in overall_rankings:
+                rank = ranking["rank"]
+                season = ranking["season"]
+                score = ranking["score"]
+                
+                if rank == 1:
+                    response_parts.append(f"🏆 **{rank}. {season}** (Score: {score}) - Best Overall Season")
+                elif rank == 2:
+                    response_parts.append(f"🥈 **{rank}. {season}** (Score: {score})")
+                elif rank == 3:
+                    response_parts.append(f"🥉 **{rank}. {season}** (Score: {score})")
+                else:
+                    response_parts.append(f"   **{rank}. {season}** (Score: {score})")
+        
+        return "\n".join(response_parts)
 
     @staticmethod
     def _format_league_leaders(results: Dict[str, Any]) -> str:

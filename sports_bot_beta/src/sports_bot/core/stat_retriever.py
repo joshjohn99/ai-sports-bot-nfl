@@ -337,6 +337,167 @@ class StatRetrieverApiAgent:
             # Return a special format to indicate multiple matches
             return "MULTIPLE_MATCHES", matching_players, None
 
+    def _smart_disambiguate_player(self, matching_players, query_context, player_name):
+        """
+        Intelligently disambiguate multiple players based on query context.
+        
+        Uses the requested metrics to determine the most likely position/player.
+        For example: 'passing touchdowns' suggests quarterback, 'sacks' suggests defensive player.
+        
+        Returns: (player_id, player_info, team_name) if disambiguation succeeds, or None if still ambiguous
+        """
+        if not query_context or not hasattr(query_context, 'metrics_needed') or not query_context.metrics_needed:
+            print(f"[SMART_DISAMBIG] No metrics context available for '{player_name}' - cannot auto-disambiguate")
+            return None
+            
+        print(f"[SMART_DISAMBIG] Attempting smart disambiguation for '{player_name}' with {len(matching_players)} matches")
+        print(f"[SMART_DISAMBIG] Query metrics: {query_context.metrics_needed}")
+        
+        # Define stat-to-position mappings (what positions are most likely for different stats)
+        stat_position_mapping = {
+            # Quarterback stats
+            'passingTouchdowns': ['Quarterback'],
+            'passingYards': ['Quarterback'],
+            'interceptions': ['Quarterback', 'Cornerback', 'Safety'],  # Could be QB throwing or defensive
+            'completions': ['Quarterback'],
+            'passingAttempts': ['Quarterback'],
+            'QBRating': ['Quarterback'],
+            'netPassingYards': ['Quarterback'],
+            
+            # Running back / Rushing stats
+            'rushingYards': ['Running Back', 'Quarterback'],  # QBs can rush too
+            'rushingTouchdowns': ['Running Back', 'Quarterback'],
+            'rushingAttempts': ['Running Back', 'Quarterback'],
+            
+            # Receiving stats
+            'receivingYards': ['Wide Receiver', 'Tight End', 'Running Back'],
+            'receivingTouchdowns': ['Wide Receiver', 'Tight End', 'Running Back'],
+            'receptions': ['Wide Receiver', 'Tight End', 'Running Back'],
+            'receivingTargets': ['Wide Receiver', 'Tight End', 'Running Back'],
+            
+            # Defensive stats
+            'sacks': ['Outside Linebacker', 'Defensive End', 'Defensive Tackle', 'Middle Linebacker'],
+            'tackles': ['Linebacker', 'Safety', 'Cornerback', 'Outside Linebacker', 'Middle Linebacker'],
+            'totalTackles': ['Linebacker', 'Safety', 'Cornerback', 'Outside Linebacker', 'Middle Linebacker'],
+            'soloTackles': ['Linebacker', 'Safety', 'Cornerback', 'Outside Linebacker', 'Middle Linebacker'],
+            'assistTackles': ['Linebacker', 'Safety', 'Cornerback', 'Outside Linebacker', 'Middle Linebacker'],
+            'tacklesForLoss': ['Linebacker', 'Defensive End', 'Defensive Tackle', 'Outside Linebacker'],
+            'fumblesForced': ['Linebacker', 'Defensive End', 'Safety', 'Outside Linebacker'],
+            'fumblesRecovered': ['Linebacker', 'Defensive End', 'Safety', 'Defensive Tackle'],
+            'interceptionTouchdowns': ['Cornerback', 'Safety', 'Linebacker'],
+            'passesDefended': ['Cornerback', 'Safety', 'Linebacker'],
+            
+            # Kicking stats
+            'fieldGoals': ['Place Kicker'],
+            'extraPoints': ['Place Kicker'],
+            'kickExtraPoints': ['Place Kicker'],
+            
+            # General stats that could apply to multiple positions
+            'touchdowns': ['Running Back', 'Wide Receiver', 'Quarterback', 'Tight End'],
+            'totalTouchdowns': ['Running Back', 'Wide Receiver', 'Quarterback', 'Tight End'],
+            'gamesPlayed': [],  # Any position
+            'fumbles': [],      # Any position
+        }
+        
+        # Collect preferred positions for all requested metrics
+        preferred_positions = set()
+        for metric in query_context.metrics_needed:
+            if metric in stat_position_mapping:
+                positions = stat_position_mapping[metric]
+                preferred_positions.update(positions)
+                print(f"[SMART_DISAMBIG] Metric '{metric}' suggests positions: {positions}")
+        
+        if not preferred_positions:
+            print(f"[SMART_DISAMBIG] No position preferences found for metrics: {query_context.metrics_needed}")
+            return None
+            
+        print(f"[SMART_DISAMBIG] All preferred positions: {preferred_positions}")
+        
+        # Score each player based on position match
+        player_scores = []
+        for match in matching_players:
+            position = match.get('position', '').strip()
+            score = 0
+            
+            # Direct position match gets highest score
+            if position in preferred_positions:
+                score = 100
+                print(f"[SMART_DISAMBIG] {match['team_name']} {position} - DIRECT MATCH (score: {score})")
+            else:
+                # Check for partial matches (e.g., "Outside Linebacker" contains "Linebacker")
+                for preferred_pos in preferred_positions:
+                    if preferred_pos.lower() in position.lower() or position.lower() in preferred_pos.lower():
+                        score = 75  # High but not perfect score
+                        print(f"[SMART_DISAMBIG] {match['team_name']} {position} - PARTIAL MATCH with '{preferred_pos}' (score: {score})")
+                        break
+                
+                if score == 0:
+                    print(f"[SMART_DISAMBIG] {match['team_name']} {position} - NO MATCH (score: {score})")
+            
+            player_scores.append((score, match))
+        
+        # Sort by score (highest first)
+        player_scores.sort(key=lambda x: x[0], reverse=True)
+        
+        # Check if we have a clear winner
+        if len(player_scores) >= 2:
+            best_score = player_scores[0][0]
+            second_best_score = player_scores[1][0]
+            
+            if best_score > second_best_score and best_score > 0:
+                # Clear winner!
+                winner = player_scores[0][1]
+                print(f"[SMART_DISAMBIG] ✅ AUTO-SELECTED: {winner['team_name']} {winner['position']} (score: {best_score})")
+                return winner['player_id'], winner['player_info'], winner['team_name']
+            else:
+                print(f"[SMART_DISAMBIG] ❌ No clear winner (best: {best_score}, second: {second_best_score})")
+        elif len(player_scores) == 1 and player_scores[0][0] > 0:
+            # Only one match with a positive score
+            winner = player_scores[0][1]
+            print(f"[SMART_DISAMBIG] ✅ AUTO-SELECTED: {winner['team_name']} {winner['position']} (only positive match)")
+            return winner['player_id'], winner['player_info'], winner['team_name']
+        
+        print(f"[SMART_DISAMBIG] ❌ Could not auto-disambiguate - need manual disambiguation")
+        return None
+
+    def _get_player_id_with_context(self, sport: str, player_name: str, query_context=None):
+        """
+        Enhanced player ID lookup with intelligent disambiguation using query context.
+        
+        This wrapper around _get_player_id() adds smart disambiguation for multiple matches
+        based on the requested metrics and likely player positions.
+        """
+        # First try the normal lookup
+        result = self._get_player_id(sport, player_name)
+        player_id, player_info_or_matches, team_name = result
+        
+        # If we got multiple matches and have query context, try smart disambiguation
+        if player_id == "MULTIPLE_MATCHES" and query_context:
+            matching_players = player_info_or_matches
+            smart_result = self._smart_disambiguate_player(matching_players, query_context, player_name)
+            
+            if smart_result:
+                # Smart disambiguation succeeded!
+                smart_id, smart_info, smart_team = smart_result
+                print(f"[SMART_DISAMBIG] 🎯 Smart disambiguation successful for '{player_name}'!")
+                
+                # Update cache with the resolved result
+                self.shared_cache.set_player(sport, player_name, {
+                    "type": "single",
+                    "player_id": smart_id,
+                    "player_info": smart_info,
+                    "team_name": smart_team
+                })
+                
+                return smart_id, smart_info, smart_team
+            else:
+                # Smart disambiguation failed, return original multiple matches result
+                print(f"[SMART_DISAMBIG] ❌ Smart disambiguation failed for '{player_name}' - will need manual disambiguation")
+                return result
+        else:
+            # Single match or no context - return original result
+            return result
+
     def get_season_format(self, sport, season_years=None):
         """Get the correct season format for the sport."""
         if season_years and len(season_years) > 0:
@@ -384,6 +545,18 @@ class StatRetrieverApiAgent:
             }
         
         return self._fetch_stats_internal(query_context, resolved_player_id, resolved_player_info, resolved_team_name)
+
+    def fetch_stats_for_season(self, query_context, season_year):
+        """Fetch stats for a specific season year."""
+        print(f"[DEBUG] fetch_stats_for_season called for season {season_year}")
+        
+        # Create a modified query context with the specific season
+        season_query_context = query_context.model_copy() if hasattr(query_context, 'model_copy') else query_context
+        season_query_context.season = str(season_year)
+        season_query_context.season_years = [season_year]
+        
+        # Use the existing fetch_stats method which already handles year parameters
+        return self.fetch_stats(season_query_context)
 
     def _fetch_stats_internal(self, query_context, pre_resolved_player_id=None, pre_resolved_player_info=None, pre_resolved_team_name=None):
         """Internal method to fetch stats with optional pre-resolved player information."""
@@ -476,7 +649,7 @@ class StatRetrieverApiAgent:
                 if query_context.player_names:
                     player_name = query_context.player_names[0] 
                     print(f"[DEBUG] Starting player search for: {player_name}")
-                    player_id, player_info_from_roster, team_name_player_found_on = self._get_player_id(sport, player_name)
+                    player_id, player_info_from_roster, team_name_player_found_on = self._get_player_id_with_context(sport, player_name, query_context)
                     
                     # Handle multiple matches
                     if player_id == "MULTIPLE_MATCHES":

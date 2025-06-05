@@ -44,7 +44,7 @@ def get_player_stats(player_id, season):
 #     touchdowns = stats.get('touchdowns')  # Adjust the key based on the API's response structure
 #     print(f"{player_name} threw {touchdowns} touchdowns in {season}.")
 # else:
-#     print(f"Player ID for {player_name} not found.")
+#     print(f"Player ID for {player_name} not found.") 
 
 api_config = {
     'NFL': {
@@ -60,6 +60,9 @@ api_config = {
             
             # From earlier user confirmation for stats:
             'PlayerStats': 'nfl-ath-statistics',           # Expects ?year=...&id=...
+            
+            # NEW: Team Statistics endpoint for season comparisons
+            'TeamStats': 'nfl-team-statistics',            # Expects ?year=...&id=...
 
             # 'GameSchedule' and 'Teams' were defaults, keeping them for now unless confirmed otherwise
             'GameSchedule': 'games',
