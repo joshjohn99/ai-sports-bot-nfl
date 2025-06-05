@@ -6,9 +6,20 @@ from datetime import datetime
 from urllib.parse import urljoin, urlencode
 
 
+from .shared_cache import get_cache_instance
+
 class StatRetrieverApiAgent:
     def __init__(self, api_config):
         self.api_config = api_config
+        
+        # 🚀 SHARED CACHE: All users benefit from same cache (prevents API explosion)
+        self.shared_cache = get_cache_instance()
+        
+        print("[CACHE] StatRetrieverApiAgent using SHARED cache - all users benefit!")
+    
+    def _get_cache_stats(self):
+        """Helper method to get cache statistics from shared cache."""
+        return self.shared_cache.get_cache_stats()
 
     def get_current_season(self, sport):
         current_year = datetime.now().year
@@ -124,28 +135,41 @@ class StatRetrieverApiAgent:
         return "I need more information to help you with this request. Could you please be more specific?"
 
     def _get_player_id(self, sport: str, player_name: str):
-        # Step 1: Fetch All Teams
-        all_teams_endpoint_key = 'AllTeams' # /nfl-team-listing/v1/data
-        all_teams_path = self.api_config[sport]['endpoints'].get(all_teams_endpoint_key)
-        if not all_teams_path:
-            print(f"Error: Endpoint key '{all_teams_endpoint_key}' not found for sport '{sport}'.")
-            return None, None, None
+        # 🚀 SHARED CACHE CHECK: Look for cached player first (benefits ALL users)
+        cached_info = self.shared_cache.get_player(sport, player_name)
+        if cached_info:
+            if cached_info["type"] == "single":
+                return cached_info["player_id"], cached_info["player_info"], cached_info["team_name"]
+            elif cached_info["type"] == "multiple":
+                return "MULTIPLE_MATCHES", cached_info["matching_players"], None
+        
+        print(f"[CACHE MISS] Player '{player_name}' not in cache - fetching from API...")
+        
+        # Step 1: Fetch All Teams (with shared caching)
+        all_teams_response_data = self.shared_cache.get_team_list(sport)
+        if all_teams_response_data is None:
+            all_teams_endpoint_key = 'AllTeams' # /nfl-team-listing/v1/data
+            all_teams_path = self.api_config[sport]['endpoints'].get(all_teams_endpoint_key)
+            if not all_teams_path:
+                print(f"Error: Endpoint key '{all_teams_endpoint_key}' not found for sport '{sport}'.")
+                return None, None, None
 
-        all_teams_url, headers = self.build_url(sport, all_teams_endpoint_key)
-        print(f"\n_get_player_id: Fetching All Teams (endpoint '{all_teams_path}') to find '{player_name}'")
-        print(f"_get_player_id: AllTeams URL: {all_teams_url}")
+            all_teams_url, headers = self.build_url(sport, all_teams_endpoint_key)
+            print(f"\n[CACHE MISS] Fetching All Teams (endpoint '{all_teams_path}') to find '{player_name}'")
+            print(f"_get_player_id: AllTeams URL: {all_teams_url}")
 
-        try:
-            response = requests.get(all_teams_url, headers=headers)
-            response.raise_for_status()
-            all_teams_response_data = response.json()
-        except requests.HTTPError as e:
-            print(f"_get_player_id: HTTP error fetching All Teams: {e}")
-            print(f"_get_player_id: Response Text: {e.response.text if e.response else 'No response text'}")
-            return None, None, None
-        except json.JSONDecodeError as e:
-            print(f"_get_player_id: JSON decode error fetching All Teams: {e.response.text if e.response else 'Error fetching data'}")
-            return None, None, None
+            try:
+                response = requests.get(all_teams_url, headers=headers)
+                response.raise_for_status()
+                all_teams_response_data = response.json()
+                self.shared_cache.set_team_list(sport, all_teams_response_data)  # Cache for ALL users
+            except requests.HTTPError as e:
+                print(f"_get_player_id: HTTP error fetching All Teams: {e}")
+                print(f"_get_player_id: Response Text: {e.response.text if e.response else 'No response text'}")
+                return None, None, None
+            except json.JSONDecodeError as e:
+                print(f"_get_player_id: JSON decode error fetching All Teams: {e.response.text if e.response else 'Error fetching data'}")
+                return None, None, None
 
         # From user log: all_teams_response_data is a list, each item is like: {'team': {'id': '22', ...}}
         # So, all_teams_response_data itself is the list of wrapped team objects.
@@ -288,12 +312,27 @@ class StatRetrieverApiAgent:
             # Only one match - return it as before
             match = matching_players[0]
             print(f"_get_player_id: SUCCESS: Found unique player '{player_name}' (ID: {match['player_id']}) on team '{match['team_name']}'.")
+            
+            # 🚀 SHARED CACHE STORE: Save successful single match (benefits ALL users)
+            self.shared_cache.set_player(sport, player_name, {
+                "type": "single",
+                "player_id": match['player_id'],
+                "player_info": match['player_info'],
+                "team_name": match['team_name']
+            })
+            
             return match['player_id'], match['player_info'], match['team_name']
         else:
             # Multiple matches - return special indicator for disambiguation
             print(f"_get_player_id: MULTIPLE MATCHES: Found {len(matching_players)} players named '{player_name}':")
             for i, match in enumerate(matching_players):
                 print(f"  {i+1}. {match['team_name']} - {match['position']} - Jersey #{match['jersey']}")
+            
+            # 🚀 SHARED CACHE STORE: Save multiple matches for disambiguation (benefits ALL users)
+            self.shared_cache.set_player(sport, player_name, {
+                "type": "multiple",
+                "matching_players": matching_players
+            })
             
             # Return a special format to indicate multiple matches
             return "MULTIPLE_MATCHES", matching_players, None

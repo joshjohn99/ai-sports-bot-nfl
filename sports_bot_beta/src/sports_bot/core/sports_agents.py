@@ -173,9 +173,8 @@ class QueryContext(BaseModel):
 
 # %%
 nlu_agent_instructions = """
-You are an NLU( Natural Language Uns) Agent for a sports intelligence system. You answer questions from user that are to hard for them to 
+You are an NLU (Natural Language Understanding) Agent for a sports intelligence system. You answer questions from user that are to hard for them to 
 think through. Getting stats and using logic is hard to figure out what is the best answer. So be aware to answer any questions about sports for example player crossover, positions crossover, and other hypothercial 
-
 
 Your job is to parse the user's natural language sports question and extract all important details into a structured object called QueryContext. QueryContext includes the following fields: 
 
@@ -184,14 +183,14 @@ Your job is to parse the user's natural language sports question and extract all
 - sport (the main sport, or "multi-sport" if covering several. If the question is general and implies NFL, default to NFL.)
 - stat_type (specific stat, e.g., "total points", "triple-doubles per 36 min")
 - stat_context (context, e.g., "regular season", "playoff history")
-- player_names (list any player names mentioned)
+- player_names (list any player names mentioned - CRITICAL: For comparison queries like "Micah Parsons vs Justin Jefferson" or "who has more touchdowns between Player A and Player B", you MUST extract ALL player names mentioned. Look for patterns like "between X and Y", "X vs Y", "X compared to Y", "X or Y", etc.)
 - team_names (list any team names mentioned)
 - time_range (e.g., "historical", "last season")
 - season_years (if any years are mentioned, list them)
 - game_context (e.g., "playoffs", "clutch", "overtime")
-- comparison_target (if comparing players/teams, capture the target)
-- metrics_needed (list the core metrics needed to answer. For counting queries like "how many teams...", include "team count" or "number of teams". For specific stats like "passing touchdowns", use "passingTouchdowns".)
-- output_expectation (describe what type of output the user expects: "ranking", "summary", "comparison", "count". For "how many..." questions, this should often be "count" or a more specific count like "team_count". For "which team..." it might be "player_team".)
+- comparison_target (if comparing players/teams, capture the target - set to "player_comparison" when multiple players are mentioned for comparison)
+- metrics_needed (list the core metrics needed to answer. For counting queries like "how many teams...", include "team count" or "number of teams". For specific stats like "passing touchdowns", use "passingTouchdowns". For "touchdowns" use "touchdowns".)
+- output_expectation (describe what type of output the user expects: "ranking", "summary", "comparison", "count". For "how many..." questions, this should often be "count" or a more specific count like "team_count". For "which team..." it might be "player_team". For comparison queries, ALWAYS set this to "comparison".)
 - requires_computation (set to true if the answer needs averages, sums, rankings)
 - reasoning_keywords (list key words that hint at reasoning or math operations)
 - edge_case (flag special cases like "multi_sport_team_comparison" or "cross_league_normalization")
@@ -206,8 +205,18 @@ Your job is to parse the user's natural language sports question and extract all
 - disclaimer_required (true if the query needs a disclaimer about cross-league or stat definitions)
 - visualization_plan (optional; suggest if visual outputs like ranking tables, bar charts, or timelines would help)
 
-The output should be a structured object, where every field is carefully populated or left blank only if clearly not applicable. Your job is not just to extract entities but also to flag when the question implies special handling, disclaimers, or explanations. Provide clean, accurate field values to prepare the Query Planner to take over.
+SPECIAL ATTENTION FOR COMPARISON QUERIES:
+- When you see phrases like "between X and Y", "X vs Y", "X compared to Y", "who has more [stat] X or Y", "X versus Y", extract ALL player names into player_names list
+- For multi-entity comparisons like "Compare X, Y, and Z", extract ALL entities mentioned
+- Set comparison_target to "player_comparison" for player comparisons, "team_comparison" for team comparisons, "season_comparison" for season comparisons
+- Set output_expectation to "comparison"
+- Examples: 
+  - "who had the most touchdowns between Micah Parsons and Justin Jefferson" → player_names: ["Micah Parsons", "Justin Jefferson"]
+  - "Compare Micah Parsons, T.J. Watt, and Myles Garrett sacks" → player_names: ["Micah Parsons", "T.J. Watt", "Myles Garrett"]
+  - "Cowboys vs Giants vs Eagles defensive stats" → team_names: ["Cowboys", "Giants", "Eagles"]
+  - "Micah Parsons 2022 vs 2023 vs 2024 stats" → player_names: ["Micah Parsons"], season_years: [2022, 2023, 2024]
 
+The output should be a structured object, where every field is carefully populated or left blank only if clearly not applicable. Your job is not just to extract entities but also to flag when the question implies special handling, disclaimers, or explanations. Provide clean, accurate field values to prepare the Query Planner to take over.
 
 If someone ask you some questions that are out of the scope of sports and sport trick questions and sport hypotheicals: DO NOT ANSWER!!! Remind the user that you are here to help with 
 their sports needs in a way nice. DON'T EVER answer questions that aren't about sports redirect to sports.
@@ -456,6 +465,10 @@ async def run_enhanced_query_processor(user_question: str, current_query_context
     print(f"📊 Processing steps: {query_plan.processing_steps}")
     print(f"📦 Data sources needed: {query_plan.data_sources_needed}")
     print(f"📝 Response format: {query_plan.response_format}")
+    print(f"🎯 Primary players in plan: {query_plan.primary_players}")
+    print(f"👥 Player names in context: {current_query_context.player_names}")
+    print(f"🔍 Comparison target: {current_query_context.comparison_target}")
+    print(f"📋 Output expectation: {current_query_context.output_expectation}")
     
     # Step 2: Initialize the executor
     stat_agent = StatRetrieverApiAgent(api_config)
@@ -472,6 +485,31 @@ async def run_enhanced_query_processor(user_question: str, current_query_context
             # New comparison logic
             print(f"⚔️ Executing player comparison query...")
             result = await query_executor._execute_player_comparison(query_plan, current_query_context)
+            
+        elif query_plan.query_type == QueryType.MULTI_PLAYER_COMPARISON:
+            # New multi-player comparison logic
+            print(f"🏆 Executing multi-player comparison query...")
+            result = await query_executor._execute_multi_player_comparison(query_plan, current_query_context)
+            
+        elif query_plan.query_type == QueryType.TEAM_COMPARISON:
+            # Team comparison logic
+            print(f"🏈 Executing team comparison query...")
+            result = await query_executor._execute_team_comparison(query_plan, current_query_context)
+            
+        elif query_plan.query_type == QueryType.MULTI_TEAM_COMPARISON:
+            # Multi-team comparison logic
+            print(f"🏈 Executing multi-team comparison query...")
+            result = await query_executor._execute_multi_team_comparison(query_plan, current_query_context)
+            
+        elif query_plan.query_type == QueryType.SEASON_COMPARISON:
+            # Season comparison logic
+            print(f"📅 Executing season comparison query...")
+            result = await query_executor._execute_season_comparison(query_plan, current_query_context)
+            
+        elif query_plan.query_type == QueryType.MULTI_SEASON_COMPARISON:
+            # Multi-season comparison logic
+            print(f"📅 Executing multi-season comparison query...")
+            result = await query_executor._execute_multi_season_comparison(query_plan, current_query_context)
             
         elif query_plan.query_type == QueryType.MULTI_STAT_PLAYER:
             # Enhanced multi-stat handling

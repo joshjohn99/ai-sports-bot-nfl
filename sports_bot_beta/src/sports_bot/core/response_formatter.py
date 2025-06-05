@@ -18,6 +18,16 @@ class ResponseFormatter:
             return ResponseFormatter._format_single_player_stat(query_results)
         elif query_type == QueryType.PLAYER_COMPARISON.value:
             return ResponseFormatter._format_player_comparison(query_results)
+        elif query_type == QueryType.MULTI_PLAYER_COMPARISON.value:
+            return ResponseFormatter._format_multi_player_comparison(query_results)
+        elif query_type == QueryType.TEAM_COMPARISON.value:
+            return ResponseFormatter._format_team_comparison(query_results)
+        elif query_type == QueryType.MULTI_TEAM_COMPARISON.value:
+            return ResponseFormatter._format_multi_team_comparison(query_results)
+        elif query_type == QueryType.SEASON_COMPARISON.value:
+            return ResponseFormatter._format_season_comparison(query_results)
+        elif query_type == QueryType.MULTI_SEASON_COMPARISON.value:
+            return ResponseFormatter._format_multi_season_comparison(query_results)
         elif query_type == QueryType.LEAGUE_LEADERS.value:
             return ResponseFormatter._format_league_leaders(query_results)
         elif query_type == QueryType.MULTI_STAT_PLAYER.value:
@@ -99,6 +109,89 @@ class ResponseFormatter:
         
         return "\n".join(response_parts)
     
+    @staticmethod
+    def _format_multi_player_comparison(results: Dict[str, Any]) -> str:
+        """Format multi-player comparison response (3+ players)."""
+        players = results.get("players", [])
+        comparison = results.get("comparison", {})
+        errors = results.get("errors")
+        
+        if not players or len(players) < 3:
+            return "❌ Need at least 3 players for multi-player comparison"
+        
+        response_parts = [f"🏆 **{len(players)}-Way Player Comparison**: {' vs '.join(players)}"]
+        response_parts.append("=" * 60)
+        
+        # Show errors if any players failed
+        if errors:
+            response_parts.append(f"⚠️ **Note**: Could not fetch data for: {', '.join(errors.keys())}")
+            response_parts.append("")
+        
+        winner_by_metric = comparison.get("winner_by_metric", {})
+        rankings_by_metric = comparison.get("rankings_by_metric", {})
+        
+        # Show detailed rankings for each metric
+        for metric, rankings in rankings_by_metric.items():
+            response_parts.append(f"**{metric.upper()} RANKINGS:**")
+            for ranking in rankings:
+                rank = ranking["rank"]
+                player = ranking["player"]
+                value = ranking["value"]
+                
+                if rank == 1:
+                    response_parts.append(f"🥇 **{rank}. {player}**: {value}")
+                elif rank == 2:
+                    response_parts.append(f"🥈 **{rank}. {player}**: {value}")
+                elif rank == 3:
+                    response_parts.append(f"🥉 **{rank}. {player}**: {value}")
+                else:
+                    response_parts.append(f"   **{rank}. {player}**: {value}")
+            response_parts.append("")
+        
+        # Show overall rankings
+        overall_rankings = comparison.get("overall_rankings", [])
+        if overall_rankings:
+            response_parts.append("🎯 **OVERALL RANKINGS** (across all metrics):")
+            for ranking in overall_rankings:
+                rank = ranking["rank"]
+                player = ranking["player"]
+                score = ranking["score"]
+                
+                if rank == 1:
+                    response_parts.append(f"🏆 **{rank}. {player}** (Score: {score})")
+                else:
+                    response_parts.append(f"   **{rank}. {player}** (Score: {score})")
+        
+        return "\n".join(response_parts)
+    
+    @staticmethod
+    def _format_team_comparison(results: Dict[str, Any]) -> str:
+        """Format team comparison response."""
+        if "error" in results:
+            return f"❌ {results['error']}"
+        return "🏈 Team comparison functionality coming soon!"
+    
+    @staticmethod
+    def _format_multi_team_comparison(results: Dict[str, Any]) -> str:
+        """Format multi-team comparison response."""
+        if "error" in results:
+            return f"❌ {results['error']}"
+        return "🏈 Multi-team comparison functionality coming soon!"
+    
+    @staticmethod
+    def _format_season_comparison(results: Dict[str, Any]) -> str:
+        """Format season comparison response."""
+        if "error" in results:
+            return f"❌ {results['error']}"
+        return "📅 Season comparison functionality coming soon!"
+    
+    @staticmethod
+    def _format_multi_season_comparison(results: Dict[str, Any]) -> str:
+        """Format multi-season comparison response."""
+        if "error" in results:
+            return f"❌ {results['error']}"
+        return "📅 Multi-season comparison functionality coming soon!"
+
     @staticmethod
     def _format_league_leaders(results: Dict[str, Any]) -> str:
         """Format league leaders response."""
