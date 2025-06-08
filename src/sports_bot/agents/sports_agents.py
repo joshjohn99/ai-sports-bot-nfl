@@ -12,14 +12,14 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, ValidationError
 import uuid
 import json
-from ..agents.debate_agent import LLMDebateAgent  # adjust path if needed
-from ..config.api_config import api_config
-from ..agents.debate_integration import DebateEngine, integrate_queryplanner_to_debate
-from .stat_retriever import StatRetrieverApiAgent
+from sports_bot.agents.debate_agent import LLMDebateAgent
+from sports_bot.config.api_config import api_config
+from sports_bot.agents.debate_integration import DebateEngine, integrate_queryplanner_to_debate
+from sports_bot.core.stats.stat_retriever import StatRetrieverApiAgent
 
 # Import new architecture components
-from .query_types import QueryType, QueryPlan, QueryClassifier, QueryExecutor
-from .response_formatter import ResponseFormatter, EdgeCaseHandler
+from sports_bot.core.query.query_types import QueryType, QueryPlan, QueryClassifier, QueryExecutor
+from sports_bot.core.stats.response_formatter import ResponseFormatter, EdgeCaseHandler
 
 # Rich imports
 from rich.console import Console
@@ -187,7 +187,15 @@ nlu_agent_instructions = """
 You are an NLU (Natural Language Understanding) Agent for a sports intelligence system. You answer questions from user that are to hard for them to 
 think through. Getting stats and using logic is hard to figure out what is the best answer. So be aware to answer any questions about sports for example player crossover, positions crossover, and other hypothercial 
 
-Your job is to parse the user's natural language sports question and extract all important details into a structured object called QueryContext. QueryContext includes the following fields: 
+Your job is to parse the user's natural language sports question and extract all important details into a structured object called QueryContext. You MUST be very careful to extract player names and metrics accurately.
+
+CRITICAL EXTRACTION RULES:
+1. For queries like "Who has the most passing yards?" - ALWAYS extract "passing yards" in metrics_needed
+2. For queries like "Compare Lamar Jackson vs Josh Allen" - ALWAYS extract ["Lamar Jackson", "Josh Allen"] in player_names  
+3. For queries like "Who leads in sacks?" - ALWAYS extract "sacks" in metrics_needed
+4. Look for ALL player names mentioned in comparison phrases like "X vs Y", "compare X and Y", "X compared to Y"
+
+QueryContext includes the following fields: 
 
 - id (generate a unique ID, e.g., uuid)
 - question (the raw user question)
@@ -632,12 +640,12 @@ async def run_enhanced_query_processor(user_question: str, current_query_context
 
 def format_enhanced_response(query_results: Dict[str, Any]) -> str:
     """
-    Format responses using the new ResponseFormatter system.
+    Format responses using the new Sports Insight Agent and ResponseFormatter system.
     """
     try:
-        # Try new formatter first
+        # Try new Sports Insight Agent first for enhanced responses
         if "fallback_used" not in query_results:
-            formatted_response = ResponseFormatter.format_response(query_results)
+            formatted_response = ResponseFormatter.format_response(query_results, use_insight_agent=True)
             return f"{formatted_response}\n\n🚀 *Powered by Enhanced Query Engine*"
         else:
             # Legacy fallback formatting

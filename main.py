@@ -11,7 +11,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 # Import and run the main sports agent
-from sports_bot.core.sports_agents import main as sports_agent_main
+from sports_bot.core.agents.sports_agents import main as sports_agent_main
 from rich.console import Console
 from rich.text import Text
 from rich.panel import Panel

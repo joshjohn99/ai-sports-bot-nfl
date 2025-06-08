@@ -11,6 +11,8 @@ Update Schedule:
 """
 
 import os
+import sys
+from pathlib import Path
 from rich.console import Console
 from rich.progress import Progress
 from dotenv import load_dotenv
@@ -18,8 +20,12 @@ import requests
 from datetime import datetime
 from urllib.parse import urljoin
 
-from sports_bot.config.api_config import api_config
-from sports_bot.core.database import db_manager, Player, Team, PlayerStats
+# Add project root to path to import the real API config
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from config.api_config import api_config  # Use the real API config
+from sports_bot.db.models import db_manager, Player, Team, PlayerStats
 
 console = Console()
 
@@ -52,13 +58,20 @@ def fetch_initial_data():
             
             for team_data in teams_data:
                 team_info = team_data.get('team', team_data)
-                team = Team(
-                    external_id=str(team_info.get('id')),
-                    name=team_info.get('name'),
-                    display_name=team_info.get('displayName'),
-                    abbreviation=team_info.get('abbreviation')
-                )
-                session.add(team)
+                
+                # Check if team already exists
+                existing_team = session.query(Team).filter_by(
+                    external_id=str(team_info.get('id'))
+                ).first()
+                
+                if not existing_team:
+                    team = Team(
+                        external_id=str(team_info.get('id')),
+                        name=team_info.get('name'),
+                        display_name=team_info.get('displayName'),
+                        abbreviation=team_info.get('abbreviation')
+                    )
+                    session.add(team)
                 progress.advance(task)
             
             session.commit()
@@ -91,13 +104,19 @@ def fetch_initial_data():
                     players = players[0].get('items', [])
                 
                 for player_data in players:
-                    player = Player(
-                        external_id=str(player_data.get('id')),
-                        name=player_data.get('fullName'),
-                        position=player_data.get('position', {}).get('abbreviation'),
-                        current_team_id=team.id
-                    )
-                    session.add(player)
+                    # Check if player already exists
+                    existing_player = session.query(Player).filter_by(
+                        external_id=str(player_data.get('id'))
+                    ).first()
+                    
+                    if not existing_player:
+                        player = Player(
+                            external_id=str(player_data.get('id')),
+                            name=player_data.get('fullName'),
+                            position=player_data.get('position', {}).get('abbreviation'),
+                            current_team_id=team.id
+                        )
+                        session.add(player)
                 
                 session.commit()
                 progress.advance(team_task)
@@ -116,6 +135,16 @@ def fetch_initial_data():
             player_task = progress.add_task("[cyan]Processing players...", total=total_players)
             
             for player in players:
+                # Check if player stats already exist for this season
+                existing_stats = session.query(PlayerStats).filter_by(
+                    player_id=player.id,
+                    season=str(current_year)
+                ).first()
+                
+                if existing_stats:
+                    progress.advance(player_task)
+                    continue  # Skip if stats already exist
+                
                 stats_url = urljoin(
                     api_config['NFL']['base_url'],
                     api_config['NFL']['endpoints']['PlayerStats']
@@ -132,25 +161,26 @@ def fetch_initial_data():
                 if response.status_code == 200:
                     stats_data = response.json()
                     
+                    # Extract stats using helper function
                     stats = PlayerStats(
                         player_id=player.id,
                         season=str(current_year),
-                        games_played=stats_data.get('gamesPlayed'),
-                        games_started=stats_data.get('gamesStarted'),
-                        passing_yards=stats_data.get('passingYards'),
-                        passing_touchdowns=stats_data.get('passingTouchdowns'),
-                        rushing_yards=stats_data.get('rushingYards'),
-                        rushing_touchdowns=stats_data.get('rushingTouchdowns'),
-                        receiving_yards=stats_data.get('receivingYards'),
-                        receptions=stats_data.get('receptions'),
-                        receiving_touchdowns=stats_data.get('receivingTouchdowns'),
-                        sacks=stats_data.get('sacks'),
-                        tackles=stats_data.get('tackles'),
-                        interceptions=stats_data.get('interceptions'),
-                        forced_fumbles=stats_data.get('forcedFumbles'),
-                        field_goals_made=stats_data.get('fieldGoalsMade'),
-                        field_goals_attempted=stats_data.get('fieldGoalsAttempted'),
-                        extra_points_made=stats_data.get('extraPointsMade')
+                        games_played=extract_stat_value(stats_data, 'gamesPlayed'),
+                        games_started=extract_stat_value(stats_data, 'gamesStarted'),
+                        passing_yards=extract_stat_value(stats_data, 'passingYards'),
+                        passing_touchdowns=extract_stat_value(stats_data, 'passingTouchdowns'),
+                        rushing_yards=extract_stat_value(stats_data, 'rushingYards'),
+                        rushing_touchdowns=extract_stat_value(stats_data, 'rushingTouchdowns'),
+                        receiving_yards=extract_stat_value(stats_data, 'receivingYards'),
+                        receptions=extract_stat_value(stats_data, 'receptions'),
+                        receiving_touchdowns=extract_stat_value(stats_data, 'receivingTouchdowns'),
+                        sacks=extract_stat_value(stats_data, 'sacks'),
+                        tackles=extract_stat_value(stats_data, 'tackles'),
+                        interceptions=extract_stat_value(stats_data, 'interceptions'),
+                        forced_fumbles=extract_stat_value(stats_data, 'forcedFumbles'),
+                        field_goals_made=extract_stat_value(stats_data, 'fieldGoalsMade'),
+                        field_goals_attempted=extract_stat_value(stats_data, 'fieldGoalsAttempted'),
+                        extra_points_made=extract_stat_value(stats_data, 'extraPointsMade')
                     )
                     session.add(stats)
                     
@@ -187,6 +217,24 @@ def fetch_initial_data():
         session.rollback()
     finally:
         session.close()
+
+def extract_stat_value(stats_data, stat_name):
+    """Extract a specific stat value from the complex API response structure."""
+    try:
+        # The API response has a complex nested structure
+        # Navigate through: statistics -> splits -> categories -> stats
+        splits = stats_data.get('statistics', {}).get('splits', {})
+        categories = splits.get('categories', [])
+        
+        for category in categories:
+            stats = category.get('stats', [])
+            for stat in stats:
+                if stat.get('name') == stat_name:
+                    return stat.get('value', 0)
+        
+        return 0  # Default value if stat not found
+    except (KeyError, AttributeError, TypeError):
+        return 0
 
 if __name__ == "__main__":
     fetch_initial_data() 

@@ -4,16 +4,27 @@ Handles formatting of query results into user-friendly responses.
 """
 
 from typing import Dict, Any, List
-from .query_types import QueryType
+from sports_bot.core.query.query_types import QueryType
+from sports_bot.core.agents.sports_commentary_agent import sports_commentary_agent
 
 class ResponseFormatter:
     """Formats query results into user-friendly responses."""
     
     @staticmethod
-    def format_response(query_results: Dict[str, Any]) -> str:
+    def format_response(query_results: Dict[str, Any], use_insight_agent: bool = True) -> str:
         """Format query results based on query type."""
         query_type = query_results.get("query_type")
         
+        # Use the new Sports Commentary Agent for enhanced responses
+        if use_insight_agent:
+            try:
+                import asyncio
+                return asyncio.run(sports_commentary_agent.generate_commentary(query_results))
+            except Exception as e:
+                print(f"[DEBUG] Commentary agent failed: {e}, falling back to basic formatter")
+                # Fall back to basic formatting if commentary agent fails
+        
+        # Original formatting methods as fallback
         if query_type == QueryType.SINGLE_PLAYER_STAT.value:
             return ResponseFormatter._format_single_player_stat(query_results)
         elif query_type == QueryType.PLAYER_COMPARISON.value:
@@ -175,7 +186,79 @@ class ResponseFormatter:
         """Format team comparison response."""
         if "error" in results:
             return f"❌ {results['error']}"
-        return "🏈 Team comparison functionality coming soon!"
+        
+        teams = results.get("teams", [])
+        comparison = results.get("comparison", {})
+        individual_stats = results.get("individual_stats", {})
+        errors = results.get("errors")
+        
+        if not teams or len(teams) < 2:
+            return "❌ Need at least 2 teams for comparison"
+        
+        response_parts = [f"🏈 **{' vs '.join(teams)}** Team Comparison:"]
+        response_parts.append("=" * 60)
+        
+        # Show errors if any teams failed
+        if errors:
+            response_parts.append(f"⚠️ **Note**: Could not fetch data for: {', '.join(errors.keys())}")
+            response_parts.append("")
+        
+        # Show rankings for each metric
+        rankings_by_metric = comparison.get("rankings_by_metric", {})
+        for metric in rankings_by_metric:
+            response_parts.append(f"**{metric.replace('_', ' ').upper()}:**")
+            
+            for ranking in rankings_by_metric[metric]:
+                rank = ranking["rank"]
+                team = ranking["team"]
+                value = ranking["value"]
+                
+                # Format with medals for top 3
+                if rank == 1:
+                    response_parts.append(f"🥇 **{rank}. {team}**: {value:,}")
+                elif rank == 2:
+                    response_parts.append(f"🥈 **{rank}. {team}**: {value:,}")
+                elif rank == 3:
+                    response_parts.append(f"🥉 **{rank}. {team}**: {value:,}")
+                else:
+                    response_parts.append(f"   **{rank}. {team}**: {value:,}")
+            
+            response_parts.append("")
+        
+        # Show overall rankings
+        overall_rankings = comparison.get("overall_rankings", [])
+        if overall_rankings:
+            response_parts.append("🏆 **OVERALL TEAM RANKINGS:**")
+            for ranking in overall_rankings:
+                rank = ranking["rank"]
+                team = ranking["team"]
+                score = ranking["score"]
+                
+                if rank == 1:
+                    response_parts.append(f"🥇 **{rank}. {team}** (Score: {score}) - Overall Leader")
+                elif rank == 2:
+                    response_parts.append(f"🥈 **{rank}. {team}** (Score: {score})")
+                elif rank == 3:
+                    response_parts.append(f"🥉 **{rank}. {team}** (Score: {score})")
+                else:
+                    response_parts.append(f"   **{rank}. {team}** (Score: {score})")
+        
+        # Add team details
+        response_parts.append("\n📊 **DETAILED TEAM STATS:**")
+        for team in teams:
+            team_data = individual_stats.get(team, {})
+            if team_data and "stats" in team_data:
+                stats = team_data["stats"]
+                response_parts.append(f"\n**{team}**:")
+                response_parts.append(f"• Games Played: {stats.get('games_played', 0)}")
+                response_parts.append(f"• Total Passing Yards: {stats.get('total_passing_yards', 0):,}")
+                response_parts.append(f"• Total Rushing Yards: {stats.get('total_rushing_yards', 0):,}")
+                response_parts.append(f"• Total Touchdowns: {stats.get('total_touchdowns', 0)}")
+                response_parts.append(f"• Total Sacks: {stats.get('total_sacks', 0)}")
+                response_parts.append(f"• Total Interceptions: {stats.get('total_interceptions', 0)}")
+                response_parts.append(f"• Active Players: {stats.get('player_count', 0)}")
+        
+        return "\n".join(response_parts)
     
     @staticmethod
     def _format_multi_team_comparison(results: Dict[str, Any]) -> str:
@@ -319,7 +402,80 @@ class ResponseFormatter:
     @staticmethod
     def _format_league_leaders(results: Dict[str, Any]) -> str:
         """Format league leaders response."""
-        return "🏆 League leaders functionality coming soon! This requires additional API endpoints."
+        if "error" in results:
+            return f"❌ {results['error']}"
+        
+        sport = results.get("sport", "").upper()
+        season = results.get("season")
+        metric = results.get("metric", "").replace("_", " ").title()
+        leaders = results.get("leaders", [])
+        league_avg = results.get("league_average", 0)
+        total_players = results.get("total_players", 0)
+        filters = results.get("filters_applied", {})
+        
+        if not leaders:
+            return f"❌ No leaders found for {metric} in {sport}"
+        
+        # Build header with filters if any
+        header_parts = [f"🏆 **{sport} {season} Leaders - {metric}**"]
+        if filters:
+            filter_parts = []
+            if 'position' in filters:
+                positions = filters['position']
+                if isinstance(positions, str):
+                    positions = [positions]
+                filter_parts.append(f"Position: {', '.join(positions)}")
+            if filter_parts:
+                header_parts.append(f"*({' | '.join(filter_parts)})*")
+        
+        response_parts = ["\n".join(header_parts)]
+        response_parts.append("=" * 60)
+        
+        # Format each leader with appropriate medal
+        for leader in leaders:
+            rank = leader["rank"]
+            name = leader["player_name"]
+            position = leader["position"]
+            value = leader["value"]
+            
+            # Format value based on metric type
+            if isinstance(value, float):
+                formatted_value = f"{value:.1f}"
+            else:
+                formatted_value = f"{value:,}"
+            
+            # Add medal for top 3
+            if rank == 1:
+                response_parts.append(f"🥇 **{rank}. {name}** ({position}): {formatted_value}")
+            elif rank == 2:
+                response_parts.append(f"🥈 **{rank}. {name}** ({position}): {formatted_value}")
+            elif rank == 3:
+                response_parts.append(f"🥉 **{rank}. {name}** ({position}): {formatted_value}")
+            else:
+                response_parts.append(f"   **{rank}. {name}** ({position}): {formatted_value}")
+        
+        # Add league context
+        response_parts.append("")
+        response_parts.append("📊 **League Context:**")
+        
+        # Format league average based on metric type
+        if isinstance(league_avg, float):
+            formatted_avg = f"{league_avg:.1f}"
+        else:
+            formatted_avg = f"{int(league_avg):,}"
+        
+        response_parts.append(f"• League Average: {formatted_avg}")
+        response_parts.append(f"• Players Analyzed: {total_players}")
+        
+        # Add note about the leader's performance vs league average
+        if leaders:
+            top_player = leaders[0]
+            top_value = top_player["value"]
+            if isinstance(top_value, (int, float)) and isinstance(league_avg, (int, float)) and league_avg > 0:
+                pct_above_avg = ((top_value - league_avg) / league_avg) * 100
+                response_parts.append(f"• Leader is {pct_above_avg:.1f}% above league average")
+        
+        return "\n".join(response_parts)
     
     @staticmethod
     def _format_multi_stat_player(results: Dict[str, Any]) -> str:

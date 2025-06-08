@@ -1,3 +1,9 @@
+"""
+Integration module for debate-based query processing
+"""
+
+from typing import Dict, Any
+
 # Import DebateEngine if it's in a separate file or local module
 # from debate_engine import DebateEngine
 
@@ -53,10 +59,24 @@ class ControversyScorer:
         return final_score
 
 class DebateEngine:
+    """Engine for debate-based query processing."""
+    
     def __init__(self):
         self.argument_builder = ArgumentBuilder()
         self.evidence_weighter = EvidenceWeighter()
         self.controversy_scorer = ControversyScorer()
+        self.context = {}
+    
+    def process_query(self, query: str) -> Dict[str, Any]:
+        """
+        Process a query through debate-style reasoning.
+        For now, this is a placeholder that returns a simple response.
+        """
+        return {
+            "processed_query": query,
+            "confidence": 1.0,
+            "reasoning": "Direct response"
+        }
 
     def run_debate(self, playerA, playerB, evidence_list, debate_type='comparison'):
         top_evidence = self.evidence_weighter.score_evidence(evidence_list)
@@ -117,21 +137,9 @@ def prepare_evidence_from_stats(playerA_stats, playerB_stats, metrics_needed):
 
     return evidence_list
 
-def integrate_queryplanner_to_debate(query_context, playerA_stats, playerB_stats):
-    debate_engine = DebateEngine()
-    evidence_list = prepare_evidence_from_stats(
-        playerA_stats,
-        playerB_stats,
-        query_context.metrics_needed
-    )
-
-    debate_type = 'comparison'
-
-    debate_result = debate_engine.run_debate(
-        playerA_stats,
-        playerB_stats,
-        evidence_list,
-        debate_type
-    )
-
-    return debate_result
+def integrate_queryplanner_to_debate(query_plan: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Integrate query planning with debate-based processing.
+    For now, this is a placeholder that returns the plan unchanged.
+    """
+    return query_plan

@@ -7,6 +7,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 import asyncio
+from datetime import datetime
 
 class QueryType(Enum):
     """Classification of different sports query types."""
@@ -54,8 +55,9 @@ class QueryClassifier:
     3. This gives us the best of both worlds: AI flexibility + deterministic reliability
     """
     
-    COMPARISON_KEYWORDS = ['vs', 'versus', 'compare', 'compared to', 'against', 'better than', 'more than', 'less than', 'between', 'who has more', 'who had more', 'who has most', 'who had most']
+    COMPARISON_KEYWORDS = ['vs', 'versus', 'compare', 'compared to', 'against', 'better than', 'between', 'who has more', 'who had more']
     RANKING_KEYWORDS = ['rank', 'ranking', 'position', 'where does', 'top', 'best', 'worst', 'leaders']
+    LEADERBOARD_KEYWORDS = ['who has the most', 'who leads', 'who has most', 'who had most', 'most', 'leads in', 'leading in', 'top', 'best', 'highest']
     AGGREGATE_KEYWORDS = ['total', 'average', 'mean', 'sum', 'combined', 'league', 'all teams']
     THRESHOLD_KEYWORDS = ['more than', 'less than', 'at least', 'over', 'under', 'above', 'below']
     GAME_SPECIFIC_KEYWORDS = ['week', 'in week', 'game against', 'performance against', 'in the game', 'that game', 'game stats']
@@ -109,32 +111,73 @@ class QueryClassifier:
             # Extract performance criteria
             plan.filters.update(cls._extract_performance_criteria(question))
         
+        # Check for leaderboard queries (who has the most, who leads, etc.)
+        elif any(keyword in question for keyword in cls.LEADERBOARD_KEYWORDS):
+            plan.query_type = QueryType.LEAGUE_LEADERS
+            plan.response_format = "ranking"
+            # For leaderboard queries, extract the main metric from the question
+            if not plan.metrics and query_context.metrics_needed:
+                plan.metrics = query_context.metrics_needed
+        
         # Classify based on AI-generated query context hints and comparison keywords
         elif (
             # Trust the NLU agent's AI analysis first
             query_context.comparison_target in ["player_comparison", "team_comparison", "season_comparison"] or
             query_context.output_expectation == "comparison" or
             # Fallback to keyword matching for simple cases (but exclude game-specific "vs" and "against")
-            any(keyword in question for keyword in cls.COMPARISON_KEYWORDS if keyword not in ['vs', 'against'])
+            any(keyword in question for keyword in cls.COMPARISON_KEYWORDS if keyword not in ['vs', 'against']) or
+            # Also check for vs/compare patterns in the question text
+            ('vs' in question and ('compare' in question or len(question.split()) <= 10)) or
+            ('versus' in question) or
+            ('compare' in question and ('vs' in question or 'and' in question))
         ):
-            if len(query_context.player_names) >= 3:
+            # Detect comparison type based on content
+            # Look for team names in the question
+            team_indicators = ['ravens', 'bills', 'cowboys', 'giants', 'chiefs', '49ers', 'niners', 'patriots', 
+                              'steelers', 'bengals', 'browns', 'titans', 'colts', 'jaguars', 'texans', 'broncos', 
+                              'chargers', 'raiders', 'dolphins', 'jets', 'panthers', 'falcons', 'saints', 'bucs',
+                              'buccaneers', 'cardinals', 'rams', 'seahawks', 'eagles', 'commanders', 'packers',
+                              'vikings', 'lions', 'bears']
+            
+            # Count how many team names appear in the question
+            teams_in_question = [team for team in team_indicators if team in question.lower()]
+            
+            if len(teams_in_question) >= 3:
+                plan.query_type = QueryType.MULTI_TEAM_COMPARISON
+                plan.response_format = "comparison_table"
+                plan.teams = teams_in_question
+            elif len(teams_in_question) == 2:
+                plan.query_type = QueryType.TEAM_COMPARISON
+                plan.response_format = "comparison_table"
+                plan.teams = teams_in_question
+            elif len(query_context.player_names) >= 3:
                 plan.query_type = QueryType.MULTI_PLAYER_COMPARISON
                 plan.response_format = "comparison_table"
+                plan.primary_players = query_context.player_names
             elif len(query_context.player_names) == 2:
                 plan.query_type = QueryType.PLAYER_COMPARISON
                 plan.response_format = "comparison_table"
-            elif len(query_context.team_names) >= 3:
-                plan.query_type = QueryType.MULTI_TEAM_COMPARISON
+                plan.primary_players = query_context.player_names
+            elif len(query_context.team_names) >= 2:
+                plan.query_type = QueryType.TEAM_COMPARISON if len(query_context.team_names) == 2 else QueryType.MULTI_TEAM_COMPARISON
                 plan.response_format = "comparison_table"
-            elif len(query_context.team_names) == 2:
-                plan.query_type = QueryType.TEAM_COMPARISON
-                plan.response_format = "comparison_table"
+                plan.teams = query_context.team_names
             elif len(query_context.season_years) >= 3 and len(query_context.player_names) == 1:
                 plan.query_type = QueryType.MULTI_SEASON_COMPARISON
                 plan.response_format = "comparison_table"
             elif len(query_context.season_years) == 2 and len(query_context.player_names) == 1:
                 plan.query_type = QueryType.SEASON_COMPARISON
                 plan.response_format = "comparison_table"
+            else:
+                # Fallback to team comparison if we detected team names
+                if teams_in_question:
+                    plan.query_type = QueryType.TEAM_COMPARISON
+                    plan.response_format = "comparison_table"
+                    plan.teams = teams_in_question
+                else:
+                    # Default to player comparison for 'vs' queries
+                    plan.query_type = QueryType.PLAYER_COMPARISON
+                    plan.response_format = "comparison_table"
         
         elif any(keyword in question for keyword in cls.RANKING_KEYWORDS):
             if 'league' in question or 'nfl' in question:
@@ -406,45 +449,76 @@ class QueryExecutor:
                 plan.primary_players = query_context.player_names
                 print(f"[DEBUG] Using player_names from query_context: {plan.primary_players}")
             else:
-                return {"error": f"Need at least 2 players for comparison. Found: {plan.primary_players}"}
+                # Fallback: Extract player names from question text
+                import re
+                question = query_context.question
+                
+                # Common player name patterns (First Last, First Last Jr., etc.)
+                # Look for capitalized words that could be names
+                # Pattern for "Compare X vs Y" or "X vs Y" (handle periods, apostrophes)
+                vs_pattern = r'(?:compare\s+)?([A-Z][a-z]+(?:[.\'\s]+[A-Z][a-z]+)*)\s+vs\s+([A-Z][a-z]+(?:[.\'\s]+[A-Z][a-z]+)*)'
+                match = re.search(vs_pattern, question, re.IGNORECASE)
+                
+                if match:
+                    player1 = match.group(1).strip()
+                    player2 = match.group(2).strip()
+                    plan.primary_players = [player1, player2]
+                    print(f"[DEBUG] Extracted player names from question: {plan.primary_players}")
+                else:
+                    # Try other patterns like "X and Y", "X compared to Y"
+                    and_pattern = r'(?:compare\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:and|compared to)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)'
+                    match = re.search(and_pattern, question, re.IGNORECASE)
+                    
+                    if match:
+                        player1 = match.group(1).strip()
+                        player2 = match.group(2).strip()
+                        plan.primary_players = [player1, player2]
+                        print(f"[DEBUG] Extracted player names from question (and pattern): {plan.primary_players}")
+                    else:
+                        return {"error": f"Need at least 2 players for comparison. Could not extract player names from: '{question}'"}
         
-        # Create a single query context with all players and metrics
-        batch_query_context = query_context.model_copy()
-        batch_query_context.player_names = plan.primary_players
+        # Fetch stats for each player individually
+        all_player_stats = {}
+        errors = {}
         
-        # Batch fetch stats for all players at once
-        try:
-            batch_stats = self.stat_agent.fetch_stats_batch(batch_query_context)
+        for player_name in plan.primary_players:
+            print(f"[DEBUG] Fetching stats for player: {player_name}")
+            player_query_context = query_context.model_copy()
+            player_query_context.player_names = [player_name]
             
-            if isinstance(batch_stats, dict) and "error" in batch_stats:
-                return {"error": batch_stats["error"]}
-            
-            all_player_stats = batch_stats.get("player_stats", {})
-            errors = batch_stats.get("errors", {})
-            
-            # If we couldn't get stats for any players, return error
-            if not all_player_stats:
-                return {
-                    "error": "Could not retrieve stats for any players",
-                    "individual_errors": errors,
-                    "players_attempted": plan.primary_players
-                }
-            
-            # Compare the stats
-            comparison_results = self._compare_player_stats(all_player_stats, plan.metrics)
-            
+            try:
+                player_stats = self.stat_agent.fetch_stats(player_query_context)
+                
+                if isinstance(player_stats, dict) and "error" in player_stats:
+                    errors[player_name] = player_stats["error"]
+                    print(f"[DEBUG] Error fetching stats for {player_name}: {player_stats['error']}")
+                else:
+                    all_player_stats[player_name] = player_stats
+                    print(f"[DEBUG] Successfully fetched stats for {player_name}")
+                    
+            except Exception as e:
+                errors[player_name] = str(e)
+                print(f"[DEBUG] Exception fetching stats for {player_name}: {str(e)}")
+        
+        # If we couldn't get stats for any players, return error
+        if not all_player_stats:
             return {
-                "query_type": plan.query_type.value,
-                "players": plan.primary_players,
-                "individual_stats": all_player_stats,
-                "comparison": comparison_results,
-                "errors": errors if errors else None,
-                "response_format": plan.response_format
+                "error": "Could not retrieve stats for any players",
+                "individual_errors": errors,
+                "players_attempted": plan.primary_players
             }
-            
-        except Exception as e:
-            print(f"[DEBUG] Exception in batch stats fetch: {str(e)}")
-            return {"error": f"Failed to fetch player stats: {str(e)}"}
+        
+        # Compare the stats
+        comparison_results = self._compare_player_stats(all_player_stats, plan.metrics)
+        
+        return {
+            "query_type": plan.query_type.value,
+            "players": plan.primary_players,
+            "individual_stats": all_player_stats,
+            "comparison": comparison_results,
+            "errors": errors if errors else None,
+            "response_format": plan.response_format
+        }
     
     def _compare_player_stats(self, all_stats: Dict[str, Any], metrics: List[str]) -> Dict[str, Any]:
         """Compare stats between players."""
@@ -454,11 +528,65 @@ class QueryExecutor:
             "summary": ""
         }
         
+        # Map user-friendly metric names to database field names
+        metric_mapping = {
+            # Space-separated formats (user-friendly)
+            "passing yards": "passing_yards",
+            "passing touchdowns": "passing_touchdowns",
+            "rushing yards": "rushing_yards",
+            "rushing touchdowns": "rushing_touchdowns",
+            "receiving yards": "receiving_yards",
+            "receiving touchdowns": "receiving_touchdowns",
+            "receptions": "receptions",
+            "touchdowns": "total_touchdowns",  # Will be calculated as sum
+            "sacks": "sacks",
+            "tackles": "tackles",
+            "interceptions": "interceptions",
+            "forced fumbles": "forced_fumbles",
+            "field goals made": "field_goals_made",
+            "field goals attempted": "field_goals_attempted",
+            "extra points made": "extra_points_made",
+            "games played": "games_played",
+            "games started": "games_started",
+            # CamelCase formats (API/NLU)
+            "passingYards": "passing_yards",
+            "passingTouchdowns": "passing_touchdowns",
+            "rushingYards": "rushing_yards",
+            "rushingTouchdowns": "rushing_touchdowns",
+            "receivingYards": "receiving_yards",
+            "receivingTouchdowns": "receiving_touchdowns",
+            "fieldGoalsMade": "field_goals_made",
+            "fieldGoalsAttempted": "field_goals_attempted",
+            "extraPointsMade": "extra_points_made",
+            "forcedFumbles": "forced_fumbles",
+            "gamesPlayed": "games_played",
+            "gamesStarted": "games_started"
+        }
+        
+        # Convert user metrics to database metrics
+        db_metrics = []
+        for metric in metrics:
+            if metric in metric_mapping:
+                mapped = metric_mapping[metric]
+                db_metrics.append(mapped)
+            else:
+                db_metrics.append(metric)
+        
+        metrics = list(set(db_metrics))  # Remove duplicates
+        
         for metric in metrics:
             player_values = {}
             for player, stats in all_stats.items():
                 if isinstance(stats, dict) and 'simple_stats' in stats:
-                    value = stats['simple_stats'].get(metric, 0)
+                    # Special case for total touchdowns
+                    if metric == "total_touchdowns":
+                        passing_tds = stats['simple_stats'].get('passing_touchdowns', 0) or 0
+                        rushing_tds = stats['simple_stats'].get('rushing_touchdowns', 0) or 0
+                        receiving_tds = stats['simple_stats'].get('receiving_touchdowns', 0) or 0
+                        value = passing_tds + rushing_tds + receiving_tds
+                    else:
+                        value = stats['simple_stats'].get(metric, 0)
+                    
                     if isinstance(value, (int, float)):
                         player_values[player] = value
             
@@ -525,7 +653,153 @@ class QueryExecutor:
     
     async def _execute_team_comparison(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
         """Execute team comparison query."""
-        return {"error": "Team comparisons require additional API endpoints not yet implemented"}
+        teams = plan.teams if hasattr(plan, 'teams') else query_context.team_names
+        
+        if len(teams) < 2:
+            return {"error": f"Need at least 2 teams for comparison. Found: {teams}"}
+        
+        # Initialize containers for results
+        all_team_stats = {}
+        errors = {}
+        
+        # Fetch stats for all teams
+        for team_name in teams:
+            print(f"[DEBUG] Fetching stats for team: {team_name}")
+            team_query_context = query_context.model_copy()
+            team_query_context.team_names = [team_name]  # Use team_names instead of teams
+            
+            try:
+                team_stats = self.stat_agent.fetch_team_stats(team_query_context)
+                
+                if isinstance(team_stats, dict) and "error" in team_stats:
+                    errors[team_name] = team_stats["error"]
+                    print(f"[DEBUG] Error fetching stats for {team_name}: {team_stats['error']}")
+                else:
+                    all_team_stats[team_name] = team_stats
+                    print(f"[DEBUG] Successfully fetched stats for {team_name}: {type(team_stats)}")
+                    if isinstance(team_stats, dict) and "stats" in team_stats:
+                        print(f"[DEBUG] Team {team_name} stats keys: {list(team_stats['stats'].keys())}")
+                    
+            except Exception as e:
+                errors[team_name] = str(e)
+                print(f"[DEBUG] Exception fetching stats for {team_name}: {str(e)}")
+        
+        if not all_team_stats:
+            return {
+                "error": f"Failed to fetch stats for any teams. Errors: {errors}",
+                "teams_attempted": teams
+            }
+        
+        # Perform the team comparison
+        comparison_results = self._compare_team_stats(all_team_stats, plan.metrics)
+        
+        return {
+            "query_type": plan.query_type.value,
+            "teams": teams,
+            "individual_stats": all_team_stats,  # Changed from "stats" to "individual_stats" for formatter compatibility
+            "comparison": comparison_results,
+            "errors": errors if errors else None,
+            "response_format": plan.response_format
+        }
+    
+    def _compare_team_stats(self, all_stats: Dict[str, Any], metrics: List[str]) -> Dict[str, Any]:
+        """Compare stats between teams."""
+        comparison = {
+            "winner_by_metric": {},
+            "rankings_by_metric": {},
+            "stat_differences": {},
+            "summary": "",
+            "overall_rankings": {}
+        }
+        
+        # Define the metrics to compare if none specified
+        if not metrics:
+            metrics = [
+                "total_passing_yards",
+                "total_rushing_yards", 
+                "total_receiving_yards",
+                "total_touchdowns",
+                "total_sacks",
+                "total_interceptions",
+                "games_played",
+                "player_count"
+            ]
+        
+        # Map user-friendly metric names to database field names
+        metric_mapping = {
+            "offensive yards": "total_offensive_yards",  # Will be calculated as sum of passing+rushing+receiving
+            "touchdowns": "total_touchdowns",
+            "points scored": "total_touchdowns",  # Use touchdowns as proxy for scoring
+            "passing yards": "total_passing_yards",
+            "rushing yards": "total_rushing_yards", 
+            "receiving yards": "total_receiving_yards",
+            "sacks": "total_sacks",
+            "interceptions": "total_interceptions"
+        }
+        
+        # Convert user metrics to database metrics
+        db_metrics = []
+        for metric in metrics:
+            if metric in metric_mapping:
+                mapped = metric_mapping[metric]
+                db_metrics.append(mapped)
+            else:
+                db_metrics.append(metric)
+        
+        metrics = list(set(db_metrics))  # Remove duplicates
+        
+        for metric in metrics:
+            team_values = {}
+            for team, stats in all_stats.items():
+                if isinstance(stats, dict) and "stats" in stats:
+                    # Special case for total offensive yards
+                    if metric == "total_offensive_yards":
+                        passing = stats["stats"].get("total_passing_yards", 0) or 0
+                        rushing = stats["stats"].get("total_rushing_yards", 0) or 0 
+                        receiving = stats["stats"].get("total_receiving_yards", 0) or 0
+                        value = passing + rushing + receiving
+                    else:
+                        value = stats["stats"].get(metric, 0)
+                    
+                    if isinstance(value, (int, float)):
+                        team_values[team] = value
+            
+            if team_values:
+                # Sort teams by metric value (descending)
+                ranked_teams = sorted(team_values.items(), key=lambda x: x[1], reverse=True)
+                
+                comparison["winner_by_metric"][metric] = {
+                    "winner": ranked_teams[0][0],
+                    "value": ranked_teams[0][1],
+                    "all_values": team_values
+                }
+                
+                comparison["rankings_by_metric"][metric] = [
+                    {"rank": i+1, "team": team, "value": value} 
+                    for i, (team, value) in enumerate(ranked_teams)
+                ]
+        
+        # Calculate overall rankings across all metrics
+        if comparison["winner_by_metric"]:
+            overall_scores = {}
+            for team in all_stats.keys():
+                score = 0
+                for metric_data in comparison["rankings_by_metric"].values():
+                    for ranking in metric_data:
+                        if ranking["team"] == team:
+                            # Lower rank number = higher score
+                            score += (len(all_stats) - ranking["rank"] + 1)
+                            break
+                overall_scores[team] = score
+            
+            # Sort by overall score
+            overall_rankings = sorted(overall_scores.items(), key=lambda x: x[1], reverse=True)
+            comparison["overall_rankings"] = [
+                {"rank": i+1, "team": team, "score": score}
+                for i, (team, score) in enumerate(overall_rankings)
+            ]
+        
+        return comparison
     
     async def _execute_multi_team_comparison(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
         """Execute multi-team comparison query (3+ teams)."""
@@ -647,60 +921,90 @@ class QueryExecutor:
         }
 
     async def _execute_league_leaders(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
-        """Execute league leaders query by calling the stat_agent's fetch_league_leaders method."""
-        # This was previously a placeholder.
-        # Now it calls the actual implementation in StatRetrieverApiAgent.
-        if not hasattr(self.stat_agent, 'fetch_league_leaders'):
-            return {"error": "StatRetrieverApiAgent does not have fetch_league_leaders method."}
-        
-        # Ensure query_context.strategy is appropriate if it wasn't set by the classifier's override
-        # (though the classifier change should handle this ideally)
-        if query_context.strategy != "leaderboard_query":
-            # This is a safeguard, ideally QueryClassifier sets plan.query_type correctly
-            # based on our forced strategy, or the strategy itself is enough for fetch_league_leaders.
-            # For now, we assume if plan.query_type is LEAGUE_LEADERS, query_context is fit for fetch_league_leaders.
-            pass # Assuming query_context is suitable if plan.query_type is LEAGUE_LEADERS
-
-        # Call the method in StatRetrieverApiAgent that handles programmatic leaderboard fetching
-        # This method is synchronous, so we don't await it directly here unless it's refactored to be async.
-        # For now, if fetch_league_leaders is synchronous, we call it directly.
-        # If your application uses asyncio extensively and fetch_league_leaders becomes async, you'd await it.
-        
-        # Assuming fetch_league_leaders is synchronous based on its current implementation in stat_retriever.py
-        # (It uses requests.get(), not an async HTTP client)
+        """Execute league leaders query."""
         try:
-            # We are in an async def, so if stat_agent methods are not async, 
-            # they should be run in an executor or StatRetrieverApiAgent needs async methods.
-            # For now, let's assume direct call if it's designed to work in this async context
-            # or that the event loop handles synchronous calls appropriately for your setup.
+            # Get the metric to rank by
+            raw_metric = plan.metrics[0] if plan.metrics else None
             
-            # Given the structure, the actual call should be made from StatRetrieverAgent,
-            # which is synchronous. The QueryExecutor is async.
-            # To bridge this, ideally StatRetrieverAgent would also have async methods or 
-            # use asyncio.to_thread for blocking calls.
-            # For a direct fix, if stat_agent.fetch_league_leaders is blocking:
-            # result = await asyncio.to_thread(self.stat_agent.fetch_league_leaders, query_context)
-            # However, let's try a direct call first and see if the execution model handles it.
-            # If fetch_league_leaders is synchronous, this call will block the event loop.
-
-            # The StatRetrieverApiAgent.fetch_league_leaders method is synchronous.
-            # QueryExecutor methods are async.
-            # To call a synchronous method from an async one without blocking the event loop
-            # for too long (especially if it makes network requests), use asyncio.to_thread.
-            import asyncio # Ensure asyncio is imported
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, self.stat_agent.fetch_league_leaders, query_context)
+            # Map space-separated metric names to database-friendly names
+            metric_mapping = {
+                "passing touchdowns": "passing_touchdowns",
+                "passing yards": "passing_yards",
+                "completion percentage": "passing_yards",  # fallback
+                "wins": "passing_yards",  # fallback for now 
+                "super bowl appearances": "passing_yards",  # fallback for now
+                "rushing yards": "rushing_yards",
+                "rushing touchdowns": "rushing_touchdowns",
+                "receiving yards": "receiving_yards",
+                "receiving touchdowns": "receiving_touchdowns",
+                "touchdowns": "touchdowns",
+                "sacks": "sacks",
+                "tackles": "tackles",
+                "interceptions": "interceptions",
+                "field goals made": "field_goals_made"
+            }
             
-            # Add query_type to the result for consistency if not already present
-            if isinstance(result, dict) and 'query_type' not in result:
-                 result['query_type'] = plan.query_type.value
-            if isinstance(result, dict) and 'response_format' not in result:
-                 result['response_format'] = plan.response_format
-            return result
+            # Convert metric name
+            metric = metric_mapping.get(raw_metric, raw_metric) if raw_metric else None
+            
+            # Fallback: Extract metric from question text if not provided
+            if not metric:
+                question_lower = query_context.question.lower()
+                
+                # Common metric patterns in questions
+                metric_patterns = {
+                    'passing yards': 'passing_yards',
+                    'passing touchdowns': 'passing_touchdowns', 
+                    'rushing yards': 'rushing_yards',
+                    'rushing touchdowns': 'rushing_touchdowns',
+                    'receiving yards': 'receiving_yards',
+                    'receiving touchdowns': 'receiving_touchdowns',
+                    'touchdowns': 'touchdowns',
+                    'sacks': 'sacks',
+                    'tackles': 'tackles',
+                    'interceptions': 'interceptions',
+                    'forced fumbles': 'forced_fumbles',
+                    'field goals': 'field_goals_made',
+                    'receptions': 'receptions'
+                }
+                
+                for pattern, db_metric in metric_patterns.items():
+                    if pattern in question_lower:
+                        metric = db_metric
+                        break
+                
+                # If still no metric found, return error
+                if not metric:
+                    return {"error": f"No metric specified for leaderboard. Question: '{query_context.question}'"}
+            
+            # Get limit if specified in filters
+            limit = plan.filters.get('limit', 10)
+            
+            # Fetch league leaders
+            leaders_data = self.stat_agent.fetch_league_leaders(
+                query_context,
+                metric=metric,
+                limit=limit
+            )
+            
+            if isinstance(leaders_data, dict) and "error" in leaders_data:
+                return leaders_data
+            
+            return {
+                "query_type": plan.query_type.value,
+                "sport": leaders_data["sport"],
+                "season": leaders_data["season"],
+                "metric": leaders_data["metric"],
+                "leaders": leaders_data["leaders"],
+                "league_average": leaders_data["league_average"],
+                "total_players": leaders_data["total_players"],
+                "filters_applied": leaders_data["filters_applied"],
+                "response_format": plan.response_format
+            }
+            
         except Exception as e:
-            # Log the exception for debugging
-            # console.print_exception(show_locals=True) # If console is available here
-            return {"error": f"Error executing league_leaders query: {str(e)}"}
+            print(f"[DEBUG] Error executing league_leaders query: {str(e)}")
+            return {"error": f"Failed to execute league leaders query: {str(e)}"}
 
     def _perform_n_way_player_comparison(self, all_stats: Dict[str, Any], metrics: List[str]) -> Dict[str, Any]:
         """Perform n-way comparison between multiple players."""
@@ -712,11 +1016,65 @@ class QueryExecutor:
             "overall_rankings": {}
         }
         
+        # Map user-friendly metric names to database field names
+        metric_mapping = {
+            # Space-separated formats (user-friendly)
+            "passing yards": "passing_yards",
+            "passing touchdowns": "passing_touchdowns",
+            "rushing yards": "rushing_yards",
+            "rushing touchdowns": "rushing_touchdowns",
+            "receiving yards": "receiving_yards",
+            "receiving touchdowns": "receiving_touchdowns",
+            "receptions": "receptions",
+            "touchdowns": "total_touchdowns",  # Will be calculated as sum
+            "sacks": "sacks",
+            "tackles": "tackles",
+            "interceptions": "interceptions",
+            "forced fumbles": "forced_fumbles",
+            "field goals made": "field_goals_made",
+            "field goals attempted": "field_goals_attempted",
+            "extra points made": "extra_points_made",
+            "games played": "games_played",
+            "games started": "games_started",
+            # CamelCase formats (API/NLU)
+            "passingYards": "passing_yards",
+            "passingTouchdowns": "passing_touchdowns",
+            "rushingYards": "rushing_yards",
+            "rushingTouchdowns": "rushing_touchdowns",
+            "receivingYards": "receiving_yards",
+            "receivingTouchdowns": "receiving_touchdowns",
+            "fieldGoalsMade": "field_goals_made",
+            "fieldGoalsAttempted": "field_goals_attempted",
+            "extraPointsMade": "extra_points_made",
+            "forcedFumbles": "forced_fumbles",
+            "gamesPlayed": "games_played",
+            "gamesStarted": "games_started"
+        }
+        
+        # Convert user metrics to database metrics
+        db_metrics = []
+        for metric in metrics:
+            if metric in metric_mapping:
+                mapped = metric_mapping[metric]
+                db_metrics.append(mapped)
+            else:
+                db_metrics.append(metric)
+        
+        metrics = list(set(db_metrics))  # Remove duplicates
+        
         for metric in metrics:
             player_values = {}
             for player, stats in all_stats.items():
                 if isinstance(stats, dict) and 'simple_stats' in stats:
-                    value = stats['simple_stats'].get(metric, 0)
+                    # Special case for total touchdowns
+                    if metric == "total_touchdowns":
+                        passing_tds = stats['simple_stats'].get('passing_touchdowns', 0) or 0
+                        rushing_tds = stats['simple_stats'].get('rushing_touchdowns', 0) or 0
+                        receiving_tds = stats['simple_stats'].get('receiving_touchdowns', 0) or 0
+                        value = passing_tds + rushing_tds + receiving_tds
+                    else:
+                        value = stats['simple_stats'].get(metric, 0)
+                    
                     if isinstance(value, (int, float)):
                         player_values[player] = value
             
@@ -766,11 +1124,65 @@ class QueryExecutor:
             "summary": f"Season comparison for {player_name}"
         }
         
+        # Map user-friendly metric names to database field names
+        metric_mapping = {
+            # Space-separated formats (user-friendly)
+            "passing yards": "passing_yards",
+            "passing touchdowns": "passing_touchdowns",
+            "rushing yards": "rushing_yards",
+            "rushing touchdowns": "rushing_touchdowns",
+            "receiving yards": "receiving_yards",
+            "receiving touchdowns": "receiving_touchdowns",
+            "receptions": "receptions",
+            "touchdowns": "total_touchdowns",  # Will be calculated as sum
+            "sacks": "sacks",
+            "tackles": "tackles",
+            "interceptions": "interceptions",
+            "forced fumbles": "forced_fumbles",
+            "field goals made": "field_goals_made",
+            "field goals attempted": "field_goals_attempted",
+            "extra points made": "extra_points_made",
+            "games played": "games_played",
+            "games started": "games_started",
+            # CamelCase formats (API/NLU)
+            "passingYards": "passing_yards",
+            "passingTouchdowns": "passing_touchdowns",
+            "rushingYards": "rushing_yards",
+            "rushingTouchdowns": "rushing_touchdowns",
+            "receivingYards": "receiving_yards",
+            "receivingTouchdowns": "receiving_touchdowns",
+            "fieldGoalsMade": "field_goals_made",
+            "fieldGoalsAttempted": "field_goals_attempted",
+            "extraPointsMade": "extra_points_made",
+            "forcedFumbles": "forced_fumbles",
+            "gamesPlayed": "games_played",
+            "gamesStarted": "games_started"
+        }
+        
+        # Convert user metrics to database metrics
+        db_metrics = []
+        for metric in metrics:
+            if metric in metric_mapping:
+                mapped = metric_mapping[metric]
+                db_metrics.append(mapped)
+            else:
+                db_metrics.append(metric)
+        
+        metrics = list(set(db_metrics))  # Remove duplicates
+        
         for metric in metrics:
             season_values = {}
             for season, stats in season_stats.items():
                 if isinstance(stats, dict) and 'simple_stats' in stats:
-                    value = stats['simple_stats'].get(metric, 0)
+                    # Special case for total touchdowns
+                    if metric == "total_touchdowns":
+                        passing_tds = stats['simple_stats'].get('passing_touchdowns', 0) or 0
+                        rushing_tds = stats['simple_stats'].get('rushing_touchdowns', 0) or 0
+                        receiving_tds = stats['simple_stats'].get('receiving_touchdowns', 0) or 0
+                        value = passing_tds + rushing_tds + receiving_tds
+                    else:
+                        value = stats['simple_stats'].get(metric, 0)
+                    
                     if isinstance(value, (int, float)):
                         season_values[season] = value
             
@@ -812,11 +1224,65 @@ class QueryExecutor:
             "overall_rankings": {}
         }
         
+        # Map user-friendly metric names to database field names
+        metric_mapping = {
+            # Space-separated formats (user-friendly)
+            "passing yards": "passing_yards",
+            "passing touchdowns": "passing_touchdowns",
+            "rushing yards": "rushing_yards",
+            "rushing touchdowns": "rushing_touchdowns",
+            "receiving yards": "receiving_yards",
+            "receiving touchdowns": "receiving_touchdowns",
+            "receptions": "receptions",
+            "touchdowns": "total_touchdowns",  # Will be calculated as sum
+            "sacks": "sacks",
+            "tackles": "tackles",
+            "interceptions": "interceptions",
+            "forced fumbles": "forced_fumbles",
+            "field goals made": "field_goals_made",
+            "field goals attempted": "field_goals_attempted",
+            "extra points made": "extra_points_made",
+            "games played": "games_played",
+            "games started": "games_started",
+            # CamelCase formats (API/NLU)
+            "passingYards": "passing_yards",
+            "passingTouchdowns": "passing_touchdowns",
+            "rushingYards": "rushing_yards",
+            "rushingTouchdowns": "rushing_touchdowns",
+            "receivingYards": "receiving_yards",
+            "receivingTouchdowns": "receiving_touchdowns",
+            "fieldGoalsMade": "field_goals_made",
+            "fieldGoalsAttempted": "field_goals_attempted",
+            "extraPointsMade": "extra_points_made",
+            "forcedFumbles": "forced_fumbles",
+            "gamesPlayed": "games_played",
+            "gamesStarted": "games_started"
+        }
+        
+        # Convert user metrics to database metrics
+        db_metrics = []
+        for metric in metrics:
+            if metric in metric_mapping:
+                mapped = metric_mapping[metric]
+                db_metrics.append(mapped)
+            else:
+                db_metrics.append(metric)
+        
+        metrics = list(set(db_metrics))  # Remove duplicates
+        
         for metric in metrics:
             season_values = {}
             for season, stats in season_stats.items():
                 if isinstance(stats, dict) and 'simple_stats' in stats:
-                    value = stats['simple_stats'].get(metric, 0)
+                    # Special case for total touchdowns
+                    if metric == "total_touchdowns":
+                        passing_tds = stats['simple_stats'].get('passing_touchdowns', 0) or 0
+                        rushing_tds = stats['simple_stats'].get('rushing_touchdowns', 0) or 0
+                        receiving_tds = stats['simple_stats'].get('receiving_touchdowns', 0) or 0
+                        value = passing_tds + rushing_tds + receiving_tds
+                    else:
+                        value = stats['simple_stats'].get(metric, 0)
+                    
                     if isinstance(value, (int, float)):
                         season_values[season] = value
             
