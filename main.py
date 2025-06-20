@@ -7,8 +7,7 @@ Run this script to start the interactive sports bot.
 import sys
 import os
 
-# Add src to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# No longer needed after installing with 'pip install -e .'
 
 # Import and run the main sports agent
 from sports_bot.core.agents.sports_agents import main as sports_agent_main

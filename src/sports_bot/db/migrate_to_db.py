@@ -5,7 +5,7 @@ Migration script to populate the database from existing JSON files.
 import os
 import json
 from datetime import datetime
-from sports_bot.core.database import db_manager, Player, Team, PlayerStats, CareerStats
+from sports_bot.db.models import db_manager, Player, Team, PlayerStats, CareerStats
 
 def migrate_data():
     """Migrate data from JSON files to SQLite database."""

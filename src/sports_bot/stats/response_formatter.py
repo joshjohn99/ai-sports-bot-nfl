@@ -5,7 +5,7 @@ Handles formatting of query results into user-friendly responses.
 
 from typing import Dict, Any, List
 from sports_bot.core.query.query_types import QueryType
-from sports_bot.core.agents.sports_commentary_agent import sports_commentary_agent
+from sports_bot.agents.sports_commentary_agent import sports_commentary_agent
 
 class ResponseFormatter:
     """Formats query results into user-friendly responses."""

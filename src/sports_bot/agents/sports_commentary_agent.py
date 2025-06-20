@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agents import Agent
+from src.agent_framework import Agent
 from typing import Dict, Any
 from pydantic import BaseModel
 import json
@@ -119,7 +119,8 @@ class SportsCommentaryAgent:
         self.agent = Agent(
             name="Sports Commentary Agent",
             instructions=SPORTS_COMMENTARY_INSTRUCTIONS,
-            model="gpt-4o"  # Use the more powerful model for better commentary
+            model="gpt-4o",  # Use the more powerful model for better commentary
+            output_type=SportsCommentaryResponse
         )
     
     async def generate_commentary(self, query_results: Dict[str, Any]) -> str:

@@ -7,6 +7,7 @@ import sys
 from rich.console import Console
 from rich.panel import Panel
 from dotenv import load_dotenv
+from pathlib import Path
 import requests
 
 console = Console()
@@ -23,7 +24,8 @@ def test_api_connection():
         return False
     
     # 2. Load environment variables
-    load_dotenv()
+    env_path = Path(__file__).parent.parent.parent.parent / ".env"
+    load_dotenv(dotenv_path=env_path)
     api_key = os.getenv('RAPIDAPI_KEY')
     
     if not api_key:

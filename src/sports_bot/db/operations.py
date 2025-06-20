@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import logging
 
 from .models import Base, Player, Team, PlayerStats, CareerStats
-from ..utils.logging import get_logger
+from sports_bot.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

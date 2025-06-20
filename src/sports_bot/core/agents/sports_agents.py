@@ -1,27 +1,26 @@
+# No longer needed after installing with 'pip install -e .'
+
 from dotenv import load_dotenv
 load_dotenv(override=True)
 from openai import OpenAI
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from agents import Agent, Runner, AgentOutputSchema
+
+from agent_framework import Agent, Runner, AgentOutputSchema
 import asyncio
-import sys
 
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, ValidationError
 import uuid
 import json
-from ..agents.debate_agent import LLMDebateAgent  # adjust path if needed
-from ..config.api_config import api_config
-from ..agents.debate_integration import DebateEngine, integrate_queryplanner_to_debate
-from .stat_retriever import StatRetrieverApiAgent
+from sports_bot.agents.debate_agent import LLMDebateAgent
+from sports_bot.config.api_config import api_config
+from sports_bot.agents.debate_integration import DebateEngine, integrate_queryplanner_to_debate
+from sports_bot.core.stats.stat_retriever import StatRetrieverApiAgent
 
 # Import new architecture components
-from .query_types import QueryType, QueryPlan, QueryClassifier, QueryExecutor
-from .response_formatter import ResponseFormatter, EdgeCaseHandler
+from sports_bot.core.query.query_types import QueryType, QueryPlan, QueryClassifier, QueryExecutor
+from sports_bot.core.stats.response_formatter import ResponseFormatter, EdgeCaseHandler
 
-# Rich imports
+# Rich imports (commented out for testing)
 from rich.console import Console
 from rich.text import Text
 from rich.panel import Panel
@@ -29,10 +28,10 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.prompt import Prompt
 
-# Initialize Rich Console
+# Initialize Rich Console (commented out for testing)
 console = Console()
 
-llm_agent = LLMDebateAgent()
+llm_agent = LLMDebateAgent()  # Commented out - not available
 
 # %%
 openai=OpenAI()
@@ -73,10 +72,10 @@ class MetricTranslation(BaseModel):
         }
 
 class MetricTranslationMap(BaseModel):
-    NBA: MetricTranslation = None
-    NFL: MetricTranslation = None
-    MLB: MetricTranslation = None
-    NHL: MetricTranslation = None
+    NBA: Optional[MetricTranslation] = None
+    NFL: Optional[MetricTranslation] = None
+    MLB: Optional[MetricTranslation] = None
+    NHL: Optional[MetricTranslation] = None
 
 class QueryContext(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:18])
@@ -139,7 +138,7 @@ class QueryContext(BaseModel):
             self.stats_filters = self.metrics_needed
 
     class Config:
-        extra = "forbid"
+        extra = "allow"
         json_schema_extra = {
             "example": {
                 "id": "sp-12345678901122",
@@ -335,8 +334,7 @@ nlu_agent = Agent(
     name="Natural Langauge Understanding",
     instructions=nlu_agent_instructions,
     model="gpt-4o-mini",
-    handoffs=[query_planner_agent],
-    output_type=QueryContext,    # This is the output type for the agent
+    output_type=QueryContext,    # This will be overridden at runtime
 )
 
 # %%
@@ -373,39 +371,60 @@ def validate_query_context(query_context):
     return query_context
 
 
+class NLUOutput(BaseModel):
+    """Simplified output schema for the NLU agent."""
+    sport: Optional[str] = 'NFL'
+    player_names: List[str] = Field(default_factory=list)
+    team_names: List[str] = Field(default_factory=list)
+    metrics_needed: List[str] = Field(default_factory=list)
+    season_years: List[int] = Field(default_factory=list)
+    comparison_target: Optional[str] = None
+    output_expectation: Optional[str] = None
+
 async def run_query_planner(user_question: str) -> QueryContext:
     console.print(Panel(Text(f"💬 User Query: " + user_question, style="bold white"), title="[cyan]Step 1: Processing Query[/cyan]", border_style="cyan"))
     
     console.print("[cyan]🧠 Initiating NLU processing...[/cyan]")
-    nlu_ctx_result = await Runner.run(nlu_agent, input=user_question)
-    nlu_ctx = query_context_factory(nlu_ctx_result)
     
-    nlu_json_str = json.dumps(nlu_ctx.model_dump(), indent=2)
+    # Use the simplified NLUOutput model for the agent
+    nlu_agent.output_type = NLUOutput
+    nlu_result = await Runner.run(nlu_agent, input=user_question)
+
+    if not nlu_result:
+        raise ValueError("NLU agent failed to produce a result.")
+
+    # Build the full QueryContext from the simple NLU output
+    nlu_data = nlu_result.model_dump()
+    nlu_data['question'] = user_question # Manually add the question
+    
+    query_context = QueryContext(**nlu_data)
+    
+    nlu_json_str = json.dumps(query_context.model_dump(), indent=2)
     console.print(Panel(Syntax(nlu_json_str, "json", theme="material", line_numbers=True),
                         title="[green]NLU Agent Output (QueryContext)[/green]", 
                         border_style="green", subtitle="Structured understanding of the query"))
 
     console.print("[cyan]📊 Initiating Query Planning...[/cyan]")
-    # Convert to dict before passing to next agent
-    nlu_ctx_dict = nlu_ctx.model_dump()
+    query_planner_agent.output_type = QueryContext # Ensure planner uses full model
     query_enrichment_ctx_result = await Runner.run(
         query_planner_agent, input=[{
             "role": "user",
-            "content": json.dumps(nlu_ctx_dict)
+            "content": json.dumps(query_context.model_dump())
         }]
     )
-    query_enrichment_ctx = query_context_factory(query_enrichment_ctx_result)
     
-    enriched_json_str = json.dumps(query_enrichment_ctx.model_dump(), indent=2)
+    if not query_enrichment_ctx_result:
+        raise ValueError("Query Planner agent failed to produce a result.")
+        
+    enriched_context = query_context_factory(query_enrichment_ctx_result)
+    
+    enriched_json_str = json.dumps(enriched_context.model_dump(), indent=2)
     console.print(Panel(Syntax(enriched_json_str, "json", theme="material", line_numbers=True),
                         title="[green]Query Planner Output (Enriched QueryContext)[/green]", 
                         border_style="green", subtitle="Plan for fetching data"))
 
-    # --- Add deterministic override for leaderboard queries ---
-    query_enrichment_ctx = _override_strategy_for_leaderboard_queries(query_enrichment_ctx)
-    # --- End override ---
-
-    return query_enrichment_ctx
+    enriched_context = _override_strategy_for_leaderboard_queries(enriched_context)
+    return enriched_context
 
 # Helper function to deterministically set leaderboard strategy
 def _override_strategy_for_leaderboard_queries(query_context: QueryContext) -> QueryContext:

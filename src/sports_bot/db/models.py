@@ -8,7 +8,7 @@ from sqlalchemy.orm import relationship, sessionmaker
 from datetime import datetime
 import os
 
-from ..config.db_config import get_db_url, DATABASE_PATH
+from sports_bot.config.db_config import get_db_url, DATABASE_PATH
 
 # Create base class for declarative models
 Base = declarative_base()
