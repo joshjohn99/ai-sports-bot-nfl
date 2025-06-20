@@ -4,7 +4,7 @@ from openai import OpenAI
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from agents import Agent, Runner, AgentOutputSchema
+from src.agent_framework import Agent, Runner, AgentOutputSchema
 import asyncio
 import sys
 
@@ -19,7 +19,7 @@ from sports_bot.core.stats.stat_retriever import StatRetrieverApiAgent
 
 # Import new architecture components
 from sports_bot.core.query.query_types import QueryType, QueryPlan, QueryClassifier, QueryExecutor
-from sports_bot.core.stats.response_formatter import ResponseFormatter, EdgeCaseHandler
+from sports_bot.stats.response_formatter import ResponseFormatter, EdgeCaseHandler
 
 # Rich imports
 from rich.console import Console
@@ -49,7 +49,7 @@ class SubQuery(BaseModel):
     metrics: List[str]
 
     class Config:
-        extra = "forbid"
+        extra = "allow"
         json_schema_extra = {
             "example": {
                 "sport": "NBA",
@@ -64,7 +64,7 @@ class MetricTranslation(BaseModel):
 
 
     class Config:
-        extra = "forbid"
+        extra = "allow"
         json_schema_extra = {
             "example": {
                 "description": "career points",
@@ -139,7 +139,7 @@ class QueryContext(BaseModel):
             self.stats_filters = self.metrics_needed
 
     class Config:
-        extra = "forbid"
+        extra = "allow"
         json_schema_extra = {
             "example": {
                 "id": "sp-12345678901122",

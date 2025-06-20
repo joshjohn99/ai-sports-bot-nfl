@@ -4,7 +4,7 @@ Handles formatting of query results into user-friendly responses.
 """
 
 from typing import Dict, Any, List
-from .query_types import QueryType
+from ..query.query_types import QueryType
 
 class ResponseFormatter:
     """Formats query results into user-friendly responses."""

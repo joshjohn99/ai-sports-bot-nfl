@@ -6,26 +6,39 @@ Testing query classification and basic functionality.
 
 import asyncio
 import sys
-sys.path.append('../src')  # Add src to path
+import os
 
-from src.sports_bot.core.sports_agents import run_query_planner, QueryContext
-from src.sports_bot.config.api_config import api_config
-from src.sports_bot.core.stat_retriever import StatRetrieverApiAgent
+# Add the project root to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
-print('Testing Phase 1 Architecture Integration...')
-print()
+print('🧪 Testing Phase 1 Architecture Integration...')
+print('=' * 50)
+
+# Try to import the main components
+try:
+    from src.sports_bot.core.agents.sports_agents import QueryContext
+    print('✅ Successfully imported QueryContext')
+except ImportError as e:
+    print(f'❌ QueryContext import error: {e}')
+    exit(1)
 
 # Test import of new modules
 try:
-    from query_types import QueryType, QueryClassifier, QueryExecutor
-    from response_formatter import ResponseFormatter, EdgeCaseHandler
-    print('✅ Successfully imported new architecture components')
+    from src.sports_bot.core.query.query_types import QueryType, QueryClassifier, QueryPlan
+    print('✅ Successfully imported QueryType, QueryClassifier, QueryPlan')
+    new_components_available = True
 except ImportError as e:
-    print(f'❌ Import error: {e}')
-    exit(1)
+    print(f'❌ Query types import error: {e}')
+    new_components_available = False
 
-# Test basic query classification
-from sports_agents import QueryContext
+try:
+    from src.sports_bot.core.stats.response_formatter import ResponseFormatter, EdgeCaseHandler
+    print('✅ Successfully imported ResponseFormatter, EdgeCaseHandler')
+    response_formatter_available = True
+except ImportError as e:
+    print(f'❌ Response formatter import error: {e}')
+    response_formatter_available = False
 
 # Test 1: Single player stat query
 print('\n🧪 Test 1: Single Player Stat Query')
