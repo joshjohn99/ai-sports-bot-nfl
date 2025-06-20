@@ -18,8 +18,8 @@ import logging
 from pathlib import Path
 
 from sports_bot.config.api_config import api_config
-from sports_bot.core.database import db_manager, Player, Team, PlayerStats
-from sports_bot.core.fetch_initial_data import fetch_initial_data
+from sports_bot.db.models import db_manager, Player, Team, PlayerStats
+from sports_bot.data.fetch_initial_data import fetch_initial_data
 from .data_validators import (
     validate_team_data,
     validate_player_data,

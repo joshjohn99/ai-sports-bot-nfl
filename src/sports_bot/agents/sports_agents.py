@@ -73,10 +73,10 @@ class MetricTranslation(BaseModel):
         }
 
 class MetricTranslationMap(BaseModel):
-    NBA: MetricTranslation = None
-    NFL: MetricTranslation = None
-    MLB: MetricTranslation = None
-    NHL: MetricTranslation = None
+    NBA: Optional[MetricTranslation] = None
+    NFL: Optional[MetricTranslation] = None
+    MLB: Optional[MetricTranslation] = None
+    NHL: Optional[MetricTranslation] = None
 
 class QueryContext(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:18])
