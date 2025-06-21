@@ -423,7 +423,7 @@ class QueryExecutor:
         elif plan.query_type == QueryType.GAME_PERFORMANCE_COMPARISON:
             return await self._execute_game_performance_comparison(plan, query_context)
         else:
-            return {"error": f"Query type {plan.query_type} not yet implemented"}
+            return {"error": f"Query type {plan.query_type.value} not fully implemented yet. Please try a different query type."}
     
     async def _execute_single_player_stat(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
         """Execute single player stat query."""
@@ -803,7 +803,18 @@ class QueryExecutor:
     
     async def _execute_multi_team_comparison(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
         """Execute multi-team comparison query (3+ teams)."""
-        return {"error": "Multi-team comparisons require additional API endpoints not yet implemented"}
+        # Multi-team comparison using database
+        teams = plan.teams if plan.teams else query_context.team_names
+        
+        if len(teams) < 3:
+            return {"error": f"Need at least 3 teams for multi-team comparison. Found: {teams}"}
+        
+        return {
+            "query_type": plan.query_type.value,
+            "teams": teams,
+            "message": "Multi-team comparison functionality requires database access. Please use the main application.",
+            "response_format": plan.response_format
+        }
     
     async def _execute_season_comparison(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
         """Execute season comparison query for a single player across multiple seasons."""

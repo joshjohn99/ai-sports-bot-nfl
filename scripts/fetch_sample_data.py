@@ -14,7 +14,7 @@ from datetime import datetime
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from src.sports_bot.db.models import db_manager, Team, Player, PlayerStats
+from src.sports_bot.database.models import db_manager, Team, Player, PlayerStats
 from src.sports_bot.config.api_config import api_config
 
 def fetch_sample_data():

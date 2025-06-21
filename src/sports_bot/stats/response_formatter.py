@@ -265,7 +265,52 @@ class ResponseFormatter:
         """Format multi-team comparison response."""
         if "error" in results:
             return f"❌ {results['error']}"
-        return "🏈 Multi-team comparison functionality coming soon!"
+        teams = results.get("teams", [])
+        comparison = results.get("comparison", {})
+        team_stats = results.get("team_stats", {})
+        
+        if len(teams) < 3:
+            return "❌ Need at least 3 teams for multi-team comparison"
+        
+        response_parts = [f"🏈 **{len(teams)}-Team Comparison**: {', '.join(teams)}"]
+        response_parts.append("=" * 60)
+        
+        # Show rankings for each metric
+        rankings_by_metric = comparison.get("rankings_by_metric", {})
+        for metric, rankings in rankings_by_metric.items():
+            response_parts.append(f"**{metric.upper()} RANKINGS:**")
+            
+            for ranking in rankings:
+                rank = ranking.get("rank", 0)
+                team = ranking.get("team", "Unknown")
+                value = ranking.get("value", 0)
+                
+                if rank == 1:
+                    response_parts.append(f"🥇 **{rank}. {team}**: {value}")
+                elif rank == 2:
+                    response_parts.append(f"🥈 **{rank}. {team}**: {value}")
+                elif rank == 3:
+                    response_parts.append(f"🥉 **{rank}. {team}**: {value}")
+                else:
+                    response_parts.append(f"   **{rank}. {team}**: {value}")
+            
+            response_parts.append("")
+        
+        # Show overall rankings
+        overall_rankings = comparison.get("overall_rankings", [])
+        if overall_rankings:
+            response_parts.append("🎯 **OVERALL TEAM RANKINGS** (across all metrics):")
+            for ranking in overall_rankings:
+                rank = ranking.get("rank", 0)
+                team = ranking.get("team", "Unknown")
+                score = ranking.get("score", 0)
+                
+                if rank == 1:
+                    response_parts.append(f"🏆 **{rank}. {team}** (Score: {score})")
+                else:
+                    response_parts.append(f"   **{rank}. {team}** (Score: {score})")
+        
+        return "\n".join(response_parts)
     
     @staticmethod
     def _format_season_comparison(results: Dict[str, Any]) -> str:

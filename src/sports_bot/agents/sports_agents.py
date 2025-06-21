@@ -1,6 +1,12 @@
 from dotenv import load_dotenv
 load_dotenv(override=True)
-from openai import OpenAI
+from langchain_openai import ChatOpenAI
+from langchain.prompts import PromptTemplate, ChatPromptTemplate
+
+from langchain.schema import HumanMessage, SystemMessage
+from langchain.output_parsers import PydanticOutputParser
+from langchain.memory import ConversationBufferMemory
+from langchain.callbacks import StreamingStdOutCallbackHandler
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,7 +21,7 @@ import json
 from sports_bot.agents.debate_agent import LLMDebateAgent
 from sports_bot.config.api_config import api_config
 from sports_bot.agents.debate_integration import DebateEngine, integrate_queryplanner_to_debate
-from sports_bot.core.stats.stat_retriever import StatRetrieverApiAgent
+from sports_bot.stats.universal_stat_retriever import UniversalStatRetriever
 
 # Import new architecture components
 from sports_bot.core.query.query_types import QueryType, QueryPlan, QueryClassifier, QueryExecutor
@@ -35,10 +41,10 @@ console = Console()
 llm_agent = LLMDebateAgent()
 
 # %%
-openai=OpenAI()
+openai=ChatOpenAI()
 
 # %% [markdown]
-# ## Let's create a Query Context Model
+# ## Let's create a Query Context Model with LangChain Support
 # 
 
 # %%
@@ -61,7 +67,6 @@ class SubQuery(BaseModel):
 class MetricTranslation(BaseModel):
     description: str
     notes: str
-
 
     class Config:
         extra = "allow"
@@ -189,11 +194,20 @@ think through. Getting stats and using logic is hard to figure out what is the b
 
 Your job is to parse the user's natural language sports question and extract all important details into a structured object called QueryContext. You MUST be very careful to extract player names and metrics accurately.
 
-CRITICAL EXTRACTION RULES:
+CRITICAL EXTRACTION RULES FOR PLAYER NAMES:
+1. Extract ALL player names mentioned, regardless of whether you recognize them or not
+2. Look for any capitalized words that could be names in sports contexts
+3. Include partial names (like "Mahomes", "Brady") and full names (like "Patrick Mahomes", "Tom Brady")
+4. For queries like "Compare Player X vs Player Y" - ALWAYS extract BOTH player names
+5. Don't limit yourself to famous players - extract ANY name that appears to be a player
+6. Look for patterns like "First Last", "Last", "Nickname", or any combination
+7. Examples of names to extract: "CJ Stroud", "Puka Nacua", "Tank Dell", "Aidan O'Connell", etc.
+
+CRITICAL EXTRACTION RULES FOR METRICS:
 1. For queries like "Who has the most passing yards?" - ALWAYS extract "passing yards" in metrics_needed
-2. For queries like "Compare Lamar Jackson vs Josh Allen" - ALWAYS extract ["Lamar Jackson", "Josh Allen"] in player_names  
+2. For queries like "Compare rushing stats" - extract relevant rushing metrics
 3. For queries like "Who leads in sacks?" - ALWAYS extract "sacks" in metrics_needed
-4. Look for ALL player names mentioned in comparison phrases like "X vs Y", "compare X and Y", "X compared to Y"
+4. Look for ALL statistical terms: yards, touchdowns, sacks, tackles, interceptions, completions, etc.
 
 QueryContext includes the following fields: 
 
@@ -202,7 +216,7 @@ QueryContext includes the following fields:
 - sport (the main sport, or "multi-sport" if covering several. If the question is general and implies NFL, default to NFL.)
 - stat_type (specific stat, e.g., "total points", "triple-doubles per 36 min")
 - stat_context (context, e.g., "regular season", "playoff history")
-- player_names (list any player names mentioned - CRITICAL: For comparison queries like "Micah Parsons vs Justin Jefferson" or "who has more touchdowns between Player A and Player B", you MUST extract ALL player names mentioned. Look for patterns like "between X and Y", "X vs Y", "X compared to Y", "X or Y", etc.)
+- player_names (list ANY and ALL player names mentioned - CRITICAL: Extract every name that could be a player, whether you recognize them or not. For comparison queries like "Player A vs Player B" or "who has more touchdowns between Player A and Player B", you MUST extract ALL player names mentioned. Look for patterns like "between X and Y", "X vs Y", "X compared to Y", "X or Y", etc.)
 - team_names (list any team names mentioned)
 - time_range (e.g., "historical", "last season")
 - season_years (if any years are mentioned, list them)
@@ -230,10 +244,10 @@ SPECIAL ATTENTION FOR COMPARISON QUERIES:
 - Set comparison_target to "player_comparison" for player comparisons, "team_comparison" for team comparisons, "season_comparison" for season comparisons
 - Set output_expectation to "comparison"
 - Examples: 
-  - "who had the most touchdowns between Micah Parsons and Justin Jefferson" → player_names: ["Micah Parsons", "Justin Jefferson"]
-  - "Compare Micah Parsons, T.J. Watt, and Myles Garrett sacks" → player_names: ["Micah Parsons", "T.J. Watt", "Myles Garrett"]
+  - "who had the most touchdowns between CJ Stroud and Anthony Richardson" → player_names: ["CJ Stroud", "Anthony Richardson"]
+  - "Compare Puka Nacua, Tank Dell, and Jaylen Waddle receiving yards" → player_names: ["Puka Nacua", "Tank Dell", "Jaylen Waddle"]
   - "Cowboys vs Giants vs Eagles defensive stats" → team_names: ["Cowboys", "Giants", "Eagles"]
-  - "Micah Parsons 2022 vs 2023 vs 2024 stats" → player_names: ["Micah Parsons"], season_years: [2022, 2023, 2024]
+  - "Aidan O'Connell 2022 vs 2023 vs 2024 stats" → player_names: ["Aidan O'Connell"], season_years: [2022, 2023, 2024]
 
 The output should be a structured object, where every field is carefully populated or left blank only if clearly not applicable. Your job is not just to extract entities but also to flag when the question implies special handling, disclaimers, or explanations. Provide clean, accurate field values to prepare the Query Planner to take over.
 
@@ -552,8 +566,8 @@ async def run_enhanced_query_processor(user_question: str, current_query_context
     console.print(classification_details_table)
     
     # Step 2: Initialize the executor
-    # Note: StatRetrieverApiAgent now uses rich console internally for its prints
-    stat_agent = StatRetrieverApiAgent(api_config)
+    # Note: UniversalStatRetriever now uses rich console internally for its prints
+    stat_agent = UniversalStatRetriever()
     query_executor = QueryExecutor(stat_agent)
     
     # Step 3: Execute based on query type
@@ -645,7 +659,7 @@ def format_enhanced_response(query_results: Dict[str, Any]) -> str:
     try:
         # Try new Sports Insight Agent first for enhanced responses
         if "fallback_used" not in query_results:
-            formatted_response = ResponseFormatter.format_response(query_results, use_insight_agent=True)
+            formatted_response = ResponseFormatter.format_response(query_results)
             return f"{formatted_response}\n\n🚀 *Powered by Enhanced Query Engine*"
         else:
             # Legacy fallback formatting
@@ -709,14 +723,9 @@ def main():
                         console.print("\n" + formatted_response)
                         continue
                     else:
-                        stat_agent = StatRetrieverApiAgent(api_config)
-                        console.print("[yellow]⚙️ Using legacy fetch_stats_with_resolved_player...")
-                        player_stats_data = stat_agent.fetch_stats_with_resolved_player(
-                            current_query_context, 
-                            resolved_player['player_id'],
-                            resolved_player['player_info'],
-                            resolved_player['team_name']
-                        )
+                        stat_agent = UniversalStatRetriever()
+                        console.print("[yellow]⚙️ Using legacy fetch_stats method...")
+                        player_stats_data = stat_agent.fetch_stats(current_query_context)
                 else:
                     console.print("[bold red]❌ Could not resolve the clarification. Please be more specific or ask your original question again.")
                     pending_disambiguation = None
@@ -744,7 +753,7 @@ def main():
                     console.print("\n" + formatted_response)
                     continue
                 else:
-                    stat_agent = StatRetrieverApiAgent(api_config)
+                    stat_agent = UniversalStatRetriever()
                     console.print("[yellow]⚙️ Using legacy fetch_stats method...")
                     player_stats_data = stat_agent.fetch_stats(current_query_context)
                 
@@ -833,3 +842,197 @@ if __name__ == "__main__":
     main()
 else:
     console.print("Sports Agent CLI - Script imported. Main execution block (__name__ == '__main__') skipped.") 
+
+# %% [markdown]
+# ## Enhanced LangChain Sports Agent Implementation
+# 
+
+class LangChainSportsAgent:
+    """Enhanced sports agent using LangChain chains and tools"""
+    
+    def __init__(self):
+        self.llm = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0.1,
+            callbacks=[StreamingStdOutCallbackHandler()]
+        )
+        
+        # Setup memory for conversation context
+        self.memory = ConversationBufferMemory(
+            return_messages=True
+        )
+        
+        # Setup output parsers
+        self.query_context_parser = PydanticOutputParser(pydantic_object=QueryContext)
+        
+        # Setup chains
+        self._setup_nlu_chain()
+        self._setup_query_planner_chain()
+        self._setup_response_chain()
+    
+    def _setup_nlu_chain(self):
+        """Setup NLU chain with proper prompt template and output parser"""
+        nlu_template = """You are an NLU (Natural Language Understanding) Agent for a sports intelligence system.
+
+Your job is to parse the user's natural language sports question and extract all important details into a structured QueryContext object.
+
+CRITICAL EXTRACTION RULES FOR PLAYER NAMES:
+1. Extract ALL player names mentioned, regardless of whether you recognize them or not
+2. Look for any capitalized words that could be names in sports contexts
+3. Include partial names (like "Mahomes", "Brady") and full names (like "Patrick Mahomes", "Tom Brady")
+4. For queries like "Compare Player X vs Player Y" - ALWAYS extract BOTH player names
+5. Don't limit yourself to famous players - extract ANY name that appears to be a player
+
+CRITICAL EXTRACTION RULES FOR METRICS:
+1. For queries like "Who has the most passing yards?" - ALWAYS extract "passing yards" in metrics_needed
+2. For queries like "Compare rushing stats" - extract relevant rushing metrics
+3. For queries like "Who leads in sacks?" - ALWAYS extract "sacks" in metrics_needed
+
+User Query: {query}
+
+{format_instructions}
+
+Extract the sports query information:"""
+        
+        self.nlu_prompt = PromptTemplate(
+            template=nlu_template,
+            input_variables=["query"],
+            partial_variables={"format_instructions": self.query_context_parser.get_format_instructions()}
+        )
+        
+        # Use new LangChain pattern: prompt | llm
+        self.nlu_chain = self.nlu_prompt | self.llm
+    
+    def _setup_query_planner_chain(self):
+        """Setup Query Planner chain"""
+        planner_template = """You are a Query Planner for a sports intelligence system.
+
+Your job is to take the structured QueryContext object and plan the next steps to retrieve accurate sports data.
+
+Input QueryContext: {query_context}
+
+Enrich this QueryContext with:
+1. sub_queries (for multi-sport queries)
+2. endpoint assignments (use only: 'PlayerStats', 'PlayerDetails', 'AllTeams', 'TeamDetails', 'PlayersByTeam')
+3. strategy selection
+4. aggregation_method if needed
+5. verification_plan and disclaimer_required flags
+
+CRITICAL: For leaderboard queries (ranking without specific players), set strategy to "leaderboard_query".
+
+{format_instructions}
+
+Enhanced QueryContext:"""
+        
+        self.planner_prompt = PromptTemplate(
+            template=planner_template,
+            input_variables=["query_context"],
+            partial_variables={"format_instructions": self.query_context_parser.get_format_instructions()}
+        )
+        
+        # Use new LangChain pattern: prompt | llm
+        self.planner_chain = self.planner_prompt | self.llm
+    
+    def _setup_response_chain(self):
+        """Setup response formatting chain"""
+        response_template = """You are a Sports Response Formatter.
+
+Take the query results and format them into an engaging, informative response for sports fans.
+
+Query Results: {query_results}
+Query Type: {query_type}
+
+Format this into a clear, engaging response that includes:
+- Key statistics and findings
+- Relevant context and insights
+- Proper formatting with emojis where appropriate
+- Clear conclusions
+
+Response:"""
+        
+        self.response_prompt = PromptTemplate(
+            template=response_template,
+            input_variables=["query_results", "query_type"]
+        )
+        
+        # Use new LangChain pattern: prompt | llm
+        self.response_chain = self.response_prompt | self.llm
+    
+    async def process_query_enhanced(self, user_question: str) -> QueryContext:
+        """Enhanced query processing using LangChain chains"""
+        console.print(Panel(Text(f"💬 User Query: " + user_question, style="bold white"), 
+                           title="[cyan]Enhanced LangChain Processing[/cyan]", border_style="cyan"))
+        
+        try:
+            # Step 1: NLU Processing
+            console.print("[cyan]🧠 Running LangChain NLU Chain...[/cyan]")
+            nlu_result = await self.nlu_chain.ainvoke({"query": user_question})
+            
+            # Parse the NLU result
+            try:
+                query_context = self.query_context_parser.parse(nlu_result.content)
+            except Exception as e:
+                # Fallback parsing
+                console.print(f"[red]Parser error: {e}, using fallback[/red]")
+                query_context = self._parse_fallback(nlu_result.content, user_question)
+            
+            # Step 2: Query Planning
+            console.print("[cyan]📊 Running LangChain Query Planner Chain...[/cyan]")
+            planner_result = await self.planner_chain.ainvoke({
+                "query_context": query_context.model_dump_json()
+            })
+            
+            # Parse the planner result
+            try:
+                enhanced_context = self.query_context_parser.parse(planner_result.content)
+            except Exception as e:
+                console.print(f"[yellow]Planner parser error: {e}, using original context[/yellow]")
+                enhanced_context = query_context
+            
+            # Apply deterministic overrides
+            enhanced_context = _override_strategy_for_leaderboard_queries(enhanced_context)
+            
+            return enhanced_context
+            
+        except Exception as e:
+            console.print(f"[red]Error in enhanced processing: {e}[/red]")
+            # Fallback to original method
+            return await run_query_planner(user_question)
+    
+    def _parse_fallback(self, llm_output: str, original_query: str) -> QueryContext:
+        """Fallback parsing when structured output fails"""
+        try:
+            # Try to extract JSON from the output
+            import re
+            json_match = re.search(r'\{.*\}', llm_output, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                data = json.loads(json_str)
+                return QueryContext(**data)
+        except:
+            pass
+        
+        # Ultimate fallback - create basic QueryContext
+        return QueryContext(
+            question=original_query,
+            sport="NFL",  # Default assumption
+            metrics_needed=[],
+            player_names=[],
+            team_names=[],
+            strategy="insufficient_information"
+        )
+    
+    async def format_response_enhanced(self, query_results: Dict[str, Any]) -> str:
+        """Enhanced response formatting using LangChain"""
+        try:
+            result = await self.response_chain.ainvoke({
+                "query_results": json.dumps(query_results, indent=2),
+                "query_type": query_results.get("query_type", "unknown")
+            })
+            return result.content
+        except Exception as e:
+            console.print(f"[yellow]Enhanced formatting failed: {e}, using fallback[/yellow]")
+            return ResponseFormatter.format_response(query_results)
+
+# Create enhanced agent instance
+enhanced_sports_agent = LangChainSportsAgent() 

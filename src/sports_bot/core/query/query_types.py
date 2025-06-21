@@ -7,6 +7,8 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 import asyncio
+from sqlalchemy import func
+from ...database.models import Player, Team, PlayerStats
 
 class QueryType(Enum):
     """Classification of different sports query types."""
@@ -114,8 +116,8 @@ class QueryClassifier:
             # Trust the NLU agent's AI analysis first
             query_context.comparison_target in ["player_comparison", "team_comparison", "season_comparison"] or
             query_context.output_expectation == "comparison" or
-            # Fallback to keyword matching for simple cases (but exclude game-specific "vs" and "against")
-            any(keyword in question for keyword in cls.COMPARISON_KEYWORDS if keyword not in ['vs', 'against'])
+            # Fallback to keyword matching for simple cases
+            any(keyword in question for keyword in cls.COMPARISON_KEYWORDS)
         ):
             if len(query_context.player_names) >= 3:
                 plan.query_type = QueryType.MULTI_PLAYER_COMPARISON
@@ -389,11 +391,52 @@ class QueryExecutor:
         
         # Use existing logic
         player_stats = self.stat_agent.fetch_stats(query_context)
+        
+        # Check if user wants season totals and calculate them
+        query_lower = query_context.question.lower()
+        if "for season" in query_lower and isinstance(player_stats, dict) and "simple_stats" in player_stats:
+            # Calculate season totals
+            simple_stats = player_stats["simple_stats"]
+            games_played = simple_stats.get("games_played", 0)
+            
+            if games_played > 0:
+                # Create enhanced response with season totals
+                player_name = player_stats.get("player_fullName", plan.primary_players[0])
+                season = player_stats.get("season", "2024-25")
+                
+                response_parts = [f"🏀 **{player_name}** Season Totals:"]
+                
+                # Points calculation
+                if "points" in query_lower:
+                    points_ppg = simple_stats.get("points", 0)
+                    if points_ppg:
+                        season_total = points_ppg * games_played
+                        response_parts.append(f"• **Season Total Points**: {season_total:,.0f} points")
+                        response_parts.append(f"• **Points Per Game**: {points_ppg} PPG")
+                        response_parts.append(f"• **Games Played**: {games_played} games")
+                        response_parts.append(f"• **Season**: {season}")
+                        response_parts.append("")
+                        response_parts.append(f"📊 **Calculation**: {points_ppg} PPG × {games_played} games = {season_total:,.0f} total points")
+                        
+                        response_parts.append("")
+                        response_parts.append("✅ **Season totals calculated from per-game averages**")
+                        response_parts.append("🚀 *Powered by Enhanced Query Engine*")
+                        
+                        # Return the calculated response directly
+                        return {
+                            "query_type": plan.query_type.value,
+                            "player": plan.primary_players[0],
+                            "stats": player_stats,
+                            "response_format": plan.response_format,
+                            "calculated_response": "\n".join(response_parts)
+                        }
+        
         return {
             "query_type": plan.query_type.value,
             "player": plan.primary_players[0],
             "stats": player_stats,
-            "response_format": plan.response_format
+            "response_format": plan.response_format,
+            "original_query": query_context.question
         }
     
     async def _execute_player_comparison(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
@@ -458,7 +501,13 @@ class QueryExecutor:
             player_values = {}
             for player, stats in all_stats.items():
                 if isinstance(stats, dict) and 'simple_stats' in stats:
-                    value = stats['simple_stats'].get(metric, 0)
+                    # Try both formats: with spaces and with underscores
+                    value = stats['simple_stats'].get(metric, None)
+                    if value is None:
+                        # Try underscore version
+                        underscore_metric = metric.replace(' ', '_')
+                        value = stats['simple_stats'].get(underscore_metric, 0)
+                    
                     if isinstance(value, (int, float)):
                         player_values[player] = value
             
@@ -524,12 +573,244 @@ class QueryExecutor:
         }
     
     async def _execute_team_comparison(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
-        """Execute team comparison query."""
-        return {"error": "Team comparisons require additional API endpoints not yet implemented"}
+        """Execute team comparison query using database aggregation."""
+        print(f"[DEBUG] _execute_team_comparison called with teams: {plan.teams}")
+        
+        teams = plan.teams if plan.teams else query_context.team_names
+        
+        if len(teams) < 2:
+            return {"error": f"Need at least 2 teams for comparison. Found: {teams}"}
+        
+        # Get team stats from database by aggregating player stats
+        team_stats = {}
+        errors = {}
+        
+        for team_name in teams:
+            try:
+                # Find team in database
+                team = self.stat_agent.db_session.query(Team).filter(
+                    Team.name.ilike(f"%{team_name}%")
+                ).first()
+                
+                if not team:
+                    errors[team_name] = "Team not found in database"
+                    continue
+                
+                # Get current season
+                season = self.stat_agent.get_season_format(query_context.sport, query_context.season_years)
+                
+                # Aggregate player stats for this team
+                team_totals = self.stat_agent.db_session.query(
+                    func.sum(PlayerStats.passing_yards).label('total_passing_yards'),
+                    func.sum(PlayerStats.rushing_yards).label('total_rushing_yards'),
+                    func.sum(PlayerStats.receiving_yards).label('total_receiving_yards'),
+                    func.sum(PlayerStats.passing_touchdowns).label('total_passing_tds'),
+                    func.sum(PlayerStats.rushing_touchdowns).label('total_rushing_tds'),
+                    func.sum(PlayerStats.receiving_touchdowns).label('total_receiving_tds'),
+                    func.sum(PlayerStats.sacks).label('total_sacks'),
+                    func.sum(PlayerStats.tackles).label('total_tackles'),
+                    func.sum(PlayerStats.interceptions).label('total_interceptions'),
+                    func.count(PlayerStats.id).label('player_count')
+                ).join(Player).filter(
+                    Player.current_team_id == team.id,
+                    PlayerStats.season == season
+                ).first()
+                
+                team_stats[team_name] = {
+                    'passing_yards': team_totals.total_passing_yards or 0,
+                    'rushing_yards': team_totals.total_rushing_yards or 0,
+                    'receiving_yards': team_totals.total_receiving_yards or 0,
+                    'total_touchdowns': (team_totals.total_passing_tds or 0) + (team_totals.total_rushing_tds or 0) + (team_totals.total_receiving_tds or 0),
+                    'sacks': team_totals.total_sacks or 0,
+                    'tackles': team_totals.total_tackles or 0,
+                    'interceptions': team_totals.total_interceptions or 0,
+                    'player_count': team_totals.player_count or 0
+                }
+                
+            except Exception as e:
+                errors[team_name] = str(e)
+                print(f"[DEBUG] Error fetching stats for team {team_name}: {e}")
+        
+        if not team_stats:
+            return {
+                "error": "Could not retrieve stats for any teams",
+                "individual_errors": errors,
+                "teams_attempted": teams
+            }
+        
+        # Compare team stats
+        comparison_results = self._compare_team_stats(team_stats, plan.metrics)
+        
+        return {
+            "query_type": plan.query_type.value,
+            "teams": list(team_stats.keys()),
+            "team_stats": team_stats,
+            "comparison": comparison_results,
+            "errors": errors if errors else None,
+            "response_format": plan.response_format
+        }
+    
+    def _compare_team_stats(self, team_stats: Dict[str, Any], metrics: List[str]) -> Dict[str, Any]:
+        """Compare stats between teams."""
+        comparison = {
+            "metrics": {},
+            "overall_winner": None,
+            "team_scores": {}
+        }
+        
+        # Compare each metric
+        for metric in ['passing_yards', 'rushing_yards', 'receiving_yards', 'total_touchdowns', 'sacks', 'tackles', 'interceptions']:
+            team_values = {}
+            for team, stats in team_stats.items():
+                value = stats.get(metric, 0)
+                if isinstance(value, (int, float)):
+                    team_values[team] = value
+            
+            if team_values:
+                comparison["metrics"][metric] = team_values
+        
+        # Calculate overall scores (sum of normalized rankings)
+        team_scores = {team: 0 for team in team_stats.keys()}
+        
+        for metric, team_values in comparison["metrics"].items():
+            # Sort teams by this metric (higher is better for most stats)
+            sorted_teams = sorted(team_values.items(), key=lambda x: x[1], reverse=True)
+            
+            # Assign points based on ranking (1st place = len(teams) points, 2nd = len(teams)-1, etc.)
+            for i, (team, value) in enumerate(sorted_teams):
+                team_scores[team] += len(sorted_teams) - i
+        
+        comparison["team_scores"] = team_scores
+        
+        # Determine overall winner
+        if team_scores:
+            comparison["overall_winner"] = max(team_scores, key=team_scores.get)
+        
+        return comparison
+    
+    def _compare_multi_team_stats(self, team_stats: Dict[str, Any], metrics: List[str]) -> Dict[str, Any]:
+        """Compare stats between multiple teams (3+) with rankings."""
+        comparison = {
+            "rankings_by_metric": {},
+            "overall_rankings": [],
+            "team_scores": {}
+        }
+        
+        # Create rankings for each metric
+        for metric in ['passing_yards', 'rushing_yards', 'receiving_yards', 'total_touchdowns', 'sacks', 'tackles', 'interceptions']:
+            team_values = {}
+            for team, stats in team_stats.items():
+                value = stats.get(metric, 0)
+                if isinstance(value, (int, float)):
+                    team_values[team] = value
+            
+            if team_values:
+                # Sort teams by this metric (higher is better)
+                sorted_teams = sorted(team_values.items(), key=lambda x: x[1], reverse=True)
+                
+                comparison["rankings_by_metric"][metric] = [
+                    {"rank": i+1, "team": team, "value": value} 
+                    for i, (team, value) in enumerate(sorted_teams)
+                ]
+        
+        # Calculate overall rankings across all metrics
+        team_scores = {team: 0 for team in team_stats.keys()}
+        
+        for metric_rankings in comparison["rankings_by_metric"].values():
+            for ranking in metric_rankings:
+                team = ranking["team"]
+                rank = ranking["rank"]
+                # Lower rank number = higher score
+                team_scores[team] += len(team_stats) - rank + 1
+        
+        comparison["team_scores"] = team_scores
+        
+        # Sort by overall score
+        overall_rankings = sorted(team_scores.items(), key=lambda x: x[1], reverse=True)
+        comparison["overall_rankings"] = [
+            {"rank": i+1, "team": team, "score": score}
+            for i, (team, score) in enumerate(overall_rankings)
+        ]
+        
+        return comparison
     
     async def _execute_multi_team_comparison(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
-        """Execute multi-team comparison query (3+ teams)."""
-        return {"error": "Multi-team comparisons require additional API endpoints not yet implemented"}
+        """Execute multi-team comparison query (3+ teams) using database aggregation."""
+        print(f"[DEBUG] _execute_multi_team_comparison called with teams: {plan.teams}")
+        
+        teams = plan.teams if plan.teams else query_context.team_names
+        
+        if len(teams) < 3:
+            return {"error": f"Need at least 3 teams for multi-team comparison. Found: {teams}"}
+        
+        # Get team stats from database by aggregating player stats
+        team_stats = {}
+        errors = {}
+        
+        for team_name in teams:
+            try:
+                # Find team in database
+                team = self.stat_agent.db_session.query(Team).filter(
+                    Team.name.ilike(f"%{team_name}%")
+                ).first()
+                
+                if not team:
+                    errors[team_name] = "Team not found in database"
+                    continue
+                
+                # Get current season
+                season = self.stat_agent.get_season_format(query_context.sport, query_context.season_years)
+                
+                # Aggregate player stats for this team
+                team_totals = self.stat_agent.db_session.query(
+                    func.sum(PlayerStats.passing_yards).label('total_passing_yards'),
+                    func.sum(PlayerStats.rushing_yards).label('total_rushing_yards'),
+                    func.sum(PlayerStats.receiving_yards).label('total_receiving_yards'),
+                    func.sum(PlayerStats.passing_touchdowns).label('total_passing_tds'),
+                    func.sum(PlayerStats.rushing_touchdowns).label('total_rushing_tds'),
+                    func.sum(PlayerStats.receiving_touchdowns).label('total_receiving_tds'),
+                    func.sum(PlayerStats.sacks).label('total_sacks'),
+                    func.sum(PlayerStats.tackles).label('total_tackles'),
+                    func.sum(PlayerStats.interceptions).label('total_interceptions'),
+                    func.count(PlayerStats.id).label('player_count')
+                ).join(Player).filter(
+                    Player.current_team_id == team.id,
+                    PlayerStats.season == season
+                ).first()
+                
+                team_stats[team_name] = {
+                    'passing_yards': team_totals.total_passing_yards or 0,
+                    'rushing_yards': team_totals.total_rushing_yards or 0,
+                    'receiving_yards': team_totals.total_receiving_yards or 0,
+                    'total_touchdowns': (team_totals.total_passing_tds or 0) + (team_totals.total_rushing_tds or 0) + (team_totals.total_receiving_tds or 0),
+                    'sacks': team_totals.total_sacks or 0,
+                    'tackles': team_totals.total_tackles or 0,
+                    'interceptions': team_totals.total_interceptions or 0,
+                    'player_count': team_totals.player_count or 0
+                }
+                
+            except Exception as e:
+                errors[team_name] = str(e)
+                print(f"[DEBUG] Error fetching stats for team {team_name}: {e}")
+        
+        if not team_stats:
+            return {
+                "error": "Could not retrieve stats for any teams",
+                "individual_errors": errors,
+                "teams_attempted": teams
+            }
+        
+        # Compare team stats and create rankings
+        comparison_results = self._compare_multi_team_stats(team_stats, plan.metrics)
+        
+        return {
+            "query_type": plan.query_type.value,
+            "teams": list(team_stats.keys()),
+            "team_stats": team_stats,
+            "comparison": comparison_results,
+            "errors": errors if errors else None,
+            "response_format": plan.response_format
+        }
     
     async def _execute_season_comparison(self, plan: QueryPlan, query_context) -> Dict[str, Any]:
         """Execute season comparison query for a single player across multiple seasons."""
@@ -745,7 +1026,6 @@ class QueryExecutor:
                         if ranking["player"] == player:
                             # Lower rank number = higher score
                             score += (len(all_stats) - ranking["rank"] + 1)
-                            break
                 overall_scores[player] = score
             
             # Sort by overall score

@@ -13,8 +13,8 @@ from rich.console import Console
 from urllib.parse import urljoin, urlencode
 
 from sports_bot.config.api_config import api_config
-from sports_bot.core.shared_cache import get_cache_instance
-from sports_bot.db.models import db_manager, Player, Team, PlayerStats, CareerStats
+from sports_bot.cache.shared_cache import get_cache_instance
+from sports_bot.database.models import db_manager, Player, Team, PlayerStats, CareerStats
 
 # --- Local Data Store Configuration ---
 # This should ideally be consistent with data_loader.py or from a shared config
@@ -130,30 +130,113 @@ class StatRetrieverApiAgent:
         if query_params: url = f"{url}?{urlencode(query_params)}"
         return url, sport_conf['headers']
 
-    # Placeholder for _get_player_id - ensure it uses local data strategy from previous iterations
     def _get_player_id(self, sport: str, player_name: str):
-        # This should be the version that prioritizes local data for AllTeams and TeamRosters
-        # For this edit, we focus on fetch_league_leaders, assuming _get_player_id is correctly implemented elsewhere
-        self.console.print(f"[dim]Stubbed _get_player_id called for {player_name}. Ensure full version is used.[/dim]")
-        return None, None, None # Placeholder
+        """Get player ID using database-first approach."""
+        # Use intelligent player matching from database
+        player, confidence, alternatives = self.find_best_matching_player(player_name)
+        
+        if player and confidence > 0.5:
+            return player.external_id, player.name, player.current_team_id
+        
+        self.console.print(f"[yellow]Could not find player ID for {player_name}[/yellow]")
+        return None, None, None
 
-    # Placeholder for _get_player_id_with_context
     def _get_player_id_with_context(self, sport: str, player_name: str, query_context=None):
-        # This would call the refined _get_player_id
-        return self._get_player_id(sport, player_name) # Simplified call for stub
+        """Get player ID with query context for disambiguation."""
+        # Use intelligent player matching with context
+        player, confidence, alternatives = self.find_best_matching_player(player_name, query_context)
+        
+        if player and confidence > 0.5:
+            return player.external_id, player.name, player.current_team_id
+        
+        # If low confidence, could use query_context to improve matching
+        if query_context and hasattr(query_context, 'metrics_needed'):
+            # Could use metrics to infer position and improve matching
+            pass
+        
+        self.console.print(f"[yellow]Could not find player ID for {player_name} with context[/yellow]")
+        return None, None, None
 
-    # Placeholder for extract_stats_using_schema
     def extract_stats_using_schema(self, data, requested_metrics, sport='NFL'):
-        # This should be the full schema extraction logic
-        # For this edit, we return a simplified mock if data is present
+        """Extract stats from API response data using schema mapping."""
         extracted = {}
-        if data and requested_metrics:
-            for metric in requested_metrics:
-                # Simplistic mock extraction - replace with your actual schema logic
-                if isinstance(data, dict) and 'statistics' in data: # A guess at typical structure
-                     extracted[metric] = {'value': 'ExtractedValue', 'displayValue': 'Extracted Value'}
-                else:
-                     extracted[metric] = {'value': 'MockValue', 'displayValue': 'Mock Value'}
+        
+        if not data or not requested_metrics:
+            return extracted
+        
+        # Handle different API response structures
+        stats_data = data
+        if isinstance(data, dict):
+            # Check for common API response structures
+            if 'statistics' in data:
+                stats_data = data['statistics']
+            elif 'data' in data:
+                stats_data = data['data']
+            elif 'stats' in data:
+                stats_data = data['stats']
+        
+        # Map common metric names to API field names
+        field_mapping = {
+            'passing_yards': ['passingYards', 'passing_yards', 'passYds'],
+            'passing_touchdowns': ['passingTouchdowns', 'passing_tds', 'passTDs'],
+            'rushing_yards': ['rushingYards', 'rushing_yards', 'rushYds'],
+            'rushing_touchdowns': ['rushingTouchdowns', 'rushing_tds', 'rushTDs'],
+            'receiving_yards': ['receivingYards', 'receiving_yards', 'recYds'],
+            'receiving_touchdowns': ['receivingTouchdowns', 'receiving_tds', 'recTDs'],
+            'receptions': ['receptions', 'catches', 'rec'],
+            'sacks': ['sacks', 'sck'],
+            'tackles': ['tackles', 'tkl'],
+            'interceptions': ['interceptions', 'int'],
+            'games_played': ['gamesPlayed', 'games_played', 'GP'],
+            'games_started': ['gamesStarted', 'games_started', 'GS']
+        }
+        
+        for metric in requested_metrics:
+            value = None
+            display_value = None
+            
+            # Try to find the metric in the data
+            possible_fields = field_mapping.get(metric, [metric])
+            
+            for field in possible_fields:
+                if isinstance(stats_data, dict):
+                    if field in stats_data:
+                        raw_value = stats_data[field]
+                        if isinstance(raw_value, dict):
+                            value = raw_value.get('value', raw_value.get('displayValue'))
+                            display_value = raw_value.get('displayValue', str(value))
+                        else:
+                            value = raw_value
+                            display_value = str(raw_value)
+                        break
+                elif isinstance(stats_data, list):
+                    # Handle list of stat objects
+                    for stat_obj in stats_data:
+                        if isinstance(stat_obj, dict) and field in stat_obj:
+                            raw_value = stat_obj[field]
+                            if isinstance(raw_value, dict):
+                                value = raw_value.get('value', raw_value.get('displayValue'))
+                                display_value = raw_value.get('displayValue', str(value))
+                            else:
+                                value = raw_value
+                                display_value = str(raw_value)
+                            break
+                    if value is not None:
+                        break
+            
+            # Store the extracted value
+            if value is not None:
+                extracted[metric] = {
+                    'value': value,
+                    'displayValue': display_value or str(value)
+                }
+            else:
+                # Return 0 for missing stats
+                extracted[metric] = {
+                    'value': 0,
+                    'displayValue': '0'
+                }
+        
         return extracted
 
     def get_season_format(self, sport, season_years=None):

@@ -5,9 +5,15 @@ Run this script to create and initialize the database with required tables and i
 """
 
 import os
+import sys
+from pathlib import Path
 
-from sports_bot.db.models import db_manager, Team
-from sports_bot.config.db_config import DATABASE_PATH
+# Add the project root to the Python path
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
+
+from src.sports_bot.db.models import db_manager, Team
+from src.sports_bot.config.db_config import DATABASE_PATH
 
 def init_database():
     """Initialize the database and create all tables."""

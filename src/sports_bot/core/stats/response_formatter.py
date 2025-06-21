@@ -1,10 +1,247 @@
 """
 Response Formatter Module
 Handles formatting of query results into user-friendly responses.
+Enhanced with LangChain for better formatting and output parsing.
 """
 
 from typing import Dict, Any, List
 from ..query.query_types import QueryType
+from langchain_openai import ChatOpenAI
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain.output_parsers import PydanticOutputParser, OutputFixingParser
+from langchain.schema import BaseOutputParser
+from pydantic import BaseModel, Field
+import json
+import re
+
+class FormattedResponse(BaseModel):
+    """Structured response model for LangChain output parsing"""
+    main_content: str = Field(description="Main response content with stats and analysis")
+    key_insights: List[str] = Field(description="List of key insights from the data")
+    visual_elements: List[str] = Field(description="Emoji and visual formatting elements")
+    conclusion: str = Field(description="Final conclusion or summary")
+    confidence_score: float = Field(description="Confidence in the response accuracy (0-1)")
+    
+class LangChainResponseFormatter:
+    """Enhanced response formatter using LangChain"""
+    
+    def __init__(self):
+        self.llm = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0.3
+        )
+        self.response_parser = PydanticOutputParser(pydantic_object=FormattedResponse)
+        self.fixing_parser = OutputFixingParser.from_llm(parser=self.response_parser, llm=self.llm)
+        self._setup_formatting_chains()
+    
+    def _setup_formatting_chains(self):
+        """Setup specialized formatting chains for different query types"""
+        
+        # Player comparison chain
+        self.comparison_template = """Format this player comparison into an engaging sports response:
+
+Query Type: {query_type}
+Players: {players}
+Comparison Data: {comparison_data}
+
+Create a response that:
+1. Builds excitement around the matchup
+2. Presents stats in an engaging way with proper context
+3. Uses sports terminology and emojis appropriately
+4. Provides clear insights about each player's strengths
+5. Gives a fair conclusion about the comparison
+
+{format_instructions}
+
+Formatted Response:"""
+        
+        self.comparison_prompt = PromptTemplate(
+            template=self.comparison_template,
+            input_variables=["query_type", "players", "comparison_data"],
+            partial_variables={"format_instructions": self.response_parser.get_format_instructions()}
+        )
+        
+        self.comparison_chain = LLMChain(
+            llm=self.llm,
+            prompt=self.comparison_prompt,
+            output_parser=self.fixing_parser
+        )
+        
+        # League leaders chain
+        self.leaders_template = """Format this league leaders response into an exciting sports narrative:
+
+Query Type: {query_type}
+Stat Category: {stat_category}
+Leaders Data: {leaders_data}
+
+Create a response that:
+1. Celebrates the achievement of leading the league
+2. Provides context about the statistic's importance
+3. Uses engaging language with proper sports terminology
+4. Ranks players with appropriate emojis (🥇🥈🥉)
+5. Adds insights about what these numbers mean
+
+{format_instructions}
+
+Formatted Response:"""
+        
+        self.leaders_prompt = PromptTemplate(
+            template=self.leaders_template,
+            input_variables=["query_type", "stat_category", "leaders_data"],
+            partial_variables={"format_instructions": self.response_parser.get_format_instructions()}
+        )
+        
+        self.leaders_chain = LLMChain(
+            llm=self.llm,
+            prompt=self.leaders_prompt,
+            output_parser=self.fixing_parser
+        )
+        
+        # Single player stats chain
+        self.single_player_template = """Format this single player stat response into an informative sports summary:
+
+Query Type: {query_type}
+Player: {player}
+Stats Data: {stats_data}
+
+Create a response that:
+1. Highlights the player's performance
+2. Provides context for the statistics
+3. Uses engaging language appropriate for sports fans
+4. Includes relevant emojis and formatting
+5. Gives meaningful insights about the numbers
+
+{format_instructions}
+
+Formatted Response:"""
+        
+        self.single_player_prompt = PromptTemplate(
+            template=self.single_player_template,
+            input_variables=["query_type", "player", "stats_data"],
+            partial_variables={"format_instructions": self.response_parser.get_format_instructions()}
+        )
+        
+        self.single_player_chain = LLMChain(
+            llm=self.llm,
+            prompt=self.single_player_prompt,
+            output_parser=self.fixing_parser
+        )
+    
+    async def format_response_enhanced(self, query_results: Dict[str, Any]) -> str:
+        """Enhanced formatting using LangChain chains"""
+        query_type = query_results.get("query_type")
+        
+        try:
+            if query_type == QueryType.PLAYER_COMPARISON.value or query_type == QueryType.MULTI_PLAYER_COMPARISON.value:
+                return await self._format_comparison_enhanced(query_results)
+            elif query_type == QueryType.LEAGUE_LEADERS.value:
+                return await self._format_leaders_enhanced(query_results)
+            elif query_type == QueryType.SINGLE_PLAYER_STAT.value:
+                return await self._format_single_player_enhanced(query_results)
+            else:
+                # Fallback to original formatting
+                return ResponseFormatter.format_response(query_results)
+                
+        except Exception as e:
+            print(f"Enhanced formatting failed: {e}, using fallback")
+            return ResponseFormatter.format_response(query_results)
+    
+    async def _format_comparison_enhanced(self, results: Dict[str, Any]) -> str:
+        """Enhanced player comparison formatting"""
+        players = results.get("players", [])
+        comparison = results.get("comparison", {})
+        
+        try:
+            result = await self.comparison_chain.ainvoke({
+                "query_type": "Player Comparison",
+                "players": ", ".join(players),
+                "comparison_data": json.dumps(comparison, indent=2)
+            })
+            
+            formatted_resp = result
+            if isinstance(formatted_resp, dict):
+                return self._build_response_from_structured(formatted_resp)
+            else:
+                return str(formatted_resp)
+                
+        except Exception as e:
+            print(f"Comparison chain error: {e}")
+            return ResponseFormatter._format_player_comparison(results)
+    
+    async def _format_leaders_enhanced(self, results: Dict[str, Any]) -> str:
+        """Enhanced league leaders formatting"""
+        ranked_stat = results.get("ranked_stat", "Unknown Stat")
+        leaders = results.get("leaders", [])
+        
+        try:
+            result = await self.leaders_chain.ainvoke({
+                "query_type": "League Leaders",
+                "stat_category": ranked_stat,
+                "leaders_data": json.dumps(leaders, indent=2)
+            })
+            
+            formatted_resp = result
+            if isinstance(formatted_resp, dict):
+                return self._build_response_from_structured(formatted_resp)
+            else:
+                return str(formatted_resp)
+                
+        except Exception as e:
+            print(f"Leaders chain error: {e}")
+            return ResponseFormatter._format_league_leaders(results)
+    
+    async def _format_single_player_enhanced(self, results: Dict[str, Any]) -> str:
+        """Enhanced single player stats formatting"""
+        player = results.get("player")
+        stats = results.get("stats", {})
+        
+        try:
+            result = await self.single_player_chain.ainvoke({
+                "query_type": "Single Player Stats",
+                "player": player,
+                "stats_data": json.dumps(stats, indent=2)
+            })
+            
+            formatted_resp = result
+            if isinstance(formatted_resp, dict):
+                return self._build_response_from_structured(formatted_resp)
+            else:
+                return str(formatted_resp)
+                
+        except Exception as e:
+            print(f"Single player chain error: {e}")
+            return ResponseFormatter._format_single_player_stat(results)
+    
+    def _build_response_from_structured(self, formatted_resp: Dict[str, Any]) -> str:
+        """Build final response from structured FormattedResponse"""
+        parts = []
+        
+        # Main content
+        main_content = formatted_resp.get("main_content", "")
+        if main_content:
+            parts.append(main_content)
+        
+        # Key insights
+        insights = formatted_resp.get("key_insights", [])
+        if insights:
+            parts.append("\n🎯 **Key Insights:**")
+            for insight in insights:
+                parts.append(f"• {insight}")
+        
+        # Conclusion
+        conclusion = formatted_resp.get("conclusion", "")
+        if conclusion:
+            parts.append(f"\n🏆 **Bottom Line:** {conclusion}")
+        
+        # Confidence indicator
+        confidence = formatted_resp.get("confidence_score", 0.0)
+        if confidence > 0.8:
+            parts.append("\n✅ *High confidence analysis*")
+        elif confidence > 0.6:
+            parts.append("\n🔍 *Moderate confidence analysis*")
+        
+        return "\n".join(parts)
 
 class ResponseFormatter:
     """Formats query results into user-friendly responses."""
@@ -44,6 +281,11 @@ class ResponseFormatter:
     @staticmethod
     def _format_single_player_stat(results: Dict[str, Any]) -> str:
         """Format single player stat response."""
+        
+        # Check if we have a pre-calculated response
+        if "calculated_response" in results:
+            return results["calculated_response"]
+        
         player = results.get("player")
         stats = results.get("stats", {})
         
@@ -51,7 +293,7 @@ class ResponseFormatter:
             return f"❌ Sorry, I couldn't get stats for {player}: {stats['error']}"
         
         if not isinstance(stats, dict) or "simple_stats" not in stats:
-            return f"❌ No stats found for {player}"
+            return f"❌ No valid stats found for {player}"
         
         simple_stats = stats["simple_stats"]
         
@@ -59,7 +301,7 @@ class ResponseFormatter:
         response_parts = [f"📊 **{player}** stats:"]
         
         for metric, value in simple_stats.items():
-            if value != "Not found" and value != "Error during extraction":
+            if value != "Not found" and value != "Error during extraction" and value != 0:
                 # Get display info if available
                 if metric in stats and isinstance(stats[metric], dict):
                     display_value = stats[metric].get('displayValue', str(value))
@@ -75,6 +317,9 @@ class ResponseFormatter:
         
         if len(response_parts) == 1:
             return f"❌ No valid stats found for {player}"
+        
+        response_parts.append("")
+        response_parts.append("🚀 *Powered by Enhanced Query Engine*")
         
         return "\n".join(response_parts)
     
@@ -175,14 +420,91 @@ class ResponseFormatter:
         """Format team comparison response."""
         if "error" in results:
             return f"❌ {results['error']}"
-        return "🏈 Team comparison functionality coming soon!"
+        
+        teams = results.get("teams", [])
+        comparison = results.get("comparison", {})
+        team_stats = results.get("team_stats", {})
+        
+        if len(teams) < 2:
+            return "❌ Need at least 2 teams for comparison"
+        
+        response_parts = [f"🏈 **Team Comparison**: {' vs '.join(teams)}"]
+        response_parts.append("=" * 50)
+        
+        # Show team stats comparison
+        if team_stats:
+            for metric, team_values in comparison.get("metrics", {}).items():
+                response_parts.append(f"**{metric.upper()}:**")
+                
+                # Sort teams by this metric
+                sorted_teams = sorted(team_values.items(), key=lambda x: x[1], reverse=True)
+                
+                for i, (team, value) in enumerate(sorted_teams, 1):
+                    if i == 1:
+                        response_parts.append(f"🏆 **{team}**: {value}")
+                    else:
+                        response_parts.append(f"   **{team}**: {value}")
+                response_parts.append("")
+        
+        # Show overall winner if available
+        winner = comparison.get("overall_winner")
+        if winner:
+            response_parts.append(f"🎯 **Overall Better Team**: {winner}")
+        
+        return "\n".join(response_parts)
     
     @staticmethod
     def _format_multi_team_comparison(results: Dict[str, Any]) -> str:
         """Format multi-team comparison response."""
         if "error" in results:
             return f"❌ {results['error']}"
-        return "🏈 Multi-team comparison functionality coming soon!"
+        
+        teams = results.get("teams", [])
+        comparison = results.get("comparison", {})
+        team_stats = results.get("team_stats", {})
+        
+        if len(teams) < 3:
+            return "❌ Need at least 3 teams for multi-team comparison"
+        
+        response_parts = [f"🏈 **{len(teams)}-Team Comparison**: {', '.join(teams)}"]
+        response_parts.append("=" * 60)
+        
+        # Show rankings for each metric
+        rankings_by_metric = comparison.get("rankings_by_metric", {})
+        for metric, rankings in rankings_by_metric.items():
+            response_parts.append(f"**{metric.upper()} RANKINGS:**")
+            
+            for ranking in rankings:
+                rank = ranking.get("rank", 0)
+                team = ranking.get("team", "Unknown")
+                value = ranking.get("value", 0)
+                
+                if rank == 1:
+                    response_parts.append(f"🥇 **{rank}. {team}**: {value}")
+                elif rank == 2:
+                    response_parts.append(f"🥈 **{rank}. {team}**: {value}")
+                elif rank == 3:
+                    response_parts.append(f"🥉 **{rank}. {team}**: {value}")
+                else:
+                    response_parts.append(f"   **{rank}. {team}**: {value}")
+            
+            response_parts.append("")
+        
+        # Show overall rankings
+        overall_rankings = comparison.get("overall_rankings", [])
+        if overall_rankings:
+            response_parts.append("🎯 **OVERALL TEAM RANKINGS** (across all metrics):")
+            for ranking in overall_rankings:
+                rank = ranking.get("rank", 0)
+                team = ranking.get("team", "Unknown")
+                score = ranking.get("score", 0)
+                
+                if rank == 1:
+                    response_parts.append(f"🏆 **{rank}. {team}** (Score: {score})")
+                else:
+                    response_parts.append(f"   **{rank}. {team}** (Score: {score})")
+        
+        return "\n".join(response_parts)
     
     @staticmethod
     def _format_season_comparison(results: Dict[str, Any]) -> str:
@@ -319,7 +641,47 @@ class ResponseFormatter:
     @staticmethod
     def _format_league_leaders(results: Dict[str, Any]) -> str:
         """Format league leaders response."""
-        return "🏆 League leaders functionality coming soon! This requires additional API endpoints."
+        if "error" in results:
+            return f"❌ {results['error']}"
+        
+        ranked_stat = results.get("ranked_stat", "Unknown Stat")
+        leaders = results.get("leaders", [])
+        season = results.get("season", "Current Season")
+        sport = results.get("sport", "NFL")
+        
+        if not leaders:
+            return f"❌ No {ranked_stat} leaders found for {season}"
+        
+        response_parts = [f"🏆 **{sport} {ranked_stat.title()} Leaders** - {season} Season"]
+        response_parts.append("=" * 50)
+        
+        # Show top leaders with medals for top 3
+        for leader in leaders:
+            rank = leader.get("rank", 0)
+            player_name = leader.get("playerName", "Unknown")
+            position = leader.get("position", "")
+            stat_value = leader.get("statValue", "0")
+            
+            # Format position display
+            position_display = f" ({position})" if position else ""
+            
+            # Add rank icons for top 3
+            if rank == 1:
+                rank_icon = "🥇"
+            elif rank == 2:
+                rank_icon = "🥈"
+            elif rank == 3:
+                rank_icon = "🥉"
+            else:
+                rank_icon = f"**{rank}.**"
+            
+            response_parts.append(f"{rank_icon} **{player_name}**{position_display} - {stat_value} {ranked_stat}")
+        
+        # Add summary info
+        response_parts.append("")
+        response_parts.append(f"📊 Showing top {len(leaders)} players ranked by {ranked_stat}")
+        
+        return "\n".join(response_parts)
     
     @staticmethod
     def _format_multi_stat_player(results: Dict[str, Any]) -> str:
