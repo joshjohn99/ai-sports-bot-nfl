@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 import asyncio
 from sqlalchemy import func
-from ...database.models import Player, Team, PlayerStats
+from ...db.models import Player, Team, PlayerStats
 
 class QueryType(Enum):
     """Classification of different sports query types."""

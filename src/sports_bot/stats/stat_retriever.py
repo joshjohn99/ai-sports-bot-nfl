@@ -14,7 +14,7 @@ from urllib.parse import urljoin, urlencode
 
 from sports_bot.config.api_config import api_config
 from sports_bot.cache.shared_cache import get_cache_instance
-from sports_bot.database.models import db_manager, Player, Team, PlayerStats, CareerStats
+from sports_bot.db.models import db_manager, Player, Team, PlayerStats, CareerStats
 
 # --- Local Data Store Configuration ---
 # This should ideally be consistent with data_loader.py or from a shared config
