@@ -49,7 +49,7 @@ def fetch_initial_data():
             api_config['NFL']['endpoints']['AllTeams']
         )
         
-        response = requests.get(teams_url, headers=headers)
+        response = requests.get(teams_url, headers=headers, timeout=30)
         response.raise_for_status()
         teams_data = response.json()
         

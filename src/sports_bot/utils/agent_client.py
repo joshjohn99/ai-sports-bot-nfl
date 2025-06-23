@@ -9,7 +9,7 @@ HEADERS = {
 def get_player_id(player_name):
     url = f"{Config.BASE_URL}players"
     params = {'search': player_name}
-    response = requests.get(url, headers=HEADERS, params=params)
+    response = requests.get(url, headers=HEADERS, params=params, timeout=30)
     response.raise_for_status()
     data = response.json()
     for player in data:
@@ -20,6 +20,6 @@ def get_player_id(player_name):
 def get_player_stats(player_id, season):
     url = f"{Config.BASE_URL}player-stats/{player_id}"
     params = {'season': season}
-    response = requests.get(url, headers=HEADERS, params=params)
+    response = requests.get(url, headers=HEADERS, params=params, timeout=30)
     response.raise_for_status()
     return response.json()

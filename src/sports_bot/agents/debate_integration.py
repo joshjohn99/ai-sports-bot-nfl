@@ -28,6 +28,8 @@ class ArgumentBuilder:
         }
 
     def build_argument(self, data, debate_type):
+        # Using random.choice for template selection - not security critical, only for variety
+        # nosec B311: This is for content generation, not cryptographic purposes
         template = random.choice(self.templates.get(debate_type, self.templates['comparison']))
         return template.format(**data)
 
@@ -53,6 +55,8 @@ class EvidenceWeighter:
 
 class ControversyScorer:
     def score(self, topic, evidence):
+        # Using random.randint for scoring variety - not security critical
+        # nosec B311: This is for game mechanics, not cryptographic purposes  
         base_score = random.randint(1, 5)
         evidence_conflict = sum(1 for e in evidence if e.get('surprise', 0) > 0.5)
         final_score = min(base_score + evidence_conflict, 10)

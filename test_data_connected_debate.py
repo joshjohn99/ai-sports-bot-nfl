@@ -29,7 +29,7 @@ async def demo_data_connected_debate():
     
     try:
         # Import with proper path
-        from sports_bot.debate.data_connected_debate_arena import start_data_connected_debate
+        from sports_bot.debate.data_connected_debate_arena import start_dynamic_data_debate
         
         console.print("[green]✅ Successfully imported debate arena![/green]")
         
@@ -58,7 +58,7 @@ async def demo_data_connected_debate():
         console.print("\n�� **Connecting to your real data systems...**\n")
         
         # Start the data-connected debate
-        await start_data_connected_debate(selected_topic)
+        await start_dynamic_data_debate(selected_topic)
         
     except ImportError as e:
         console.print(f"[red]❌ Import error: {e}[/red]")

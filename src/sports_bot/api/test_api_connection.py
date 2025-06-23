@@ -48,7 +48,7 @@ def test_api_connection():
     for endpoint_name, endpoint in endpoints_to_test:
         try:
             print(f"\nTesting {endpoint_name}...", end="")
-            response = requests.get(f"{base_url}{endpoint}", headers=headers)
+            response = requests.get(f"{base_url}{endpoint}", headers=headers, timeout=30)
             
             if response.status_code == 200:
                 print(" ✓ Success!")

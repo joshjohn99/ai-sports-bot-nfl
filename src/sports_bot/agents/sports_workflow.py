@@ -10,10 +10,14 @@ This module provides LangGraph-based workflows for:
 
 import asyncio
 import json
+import logging
 from typing import Dict, List, Any, Optional, Union, Tuple, TypedDict
 from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # LangGraph imports
 try:
@@ -124,11 +128,12 @@ class SportsWorkflowOrchestrator:
                     temperature=0.1,
                     max_tokens=2000
                 )
-            except:
+            except Exception as e:
+                logger.warning(f"Failed to create ChatOpenAI with GPT-4: {e}")
                 try:
                     return ChatOpenAI(temperature=0.1)
-                except:
-                    pass
+                except Exception as fallback_error:
+                    logger.error(f"Failed to create ChatOpenAI with fallback settings: {fallback_error}")
         return None
 
     def _create_checkpointer(self):
@@ -136,8 +141,8 @@ class SportsWorkflowOrchestrator:
         if LANGGRAPH_AVAILABLE:
             try:
                 return SqliteSaver.from_conn_string(":memory:")
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to create SQLite checkpointer: {e}")
         return None
 
     def _initialize_sport_processors(self) -> Dict[str, Any]:

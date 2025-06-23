@@ -125,9 +125,13 @@ class UniversalApiConfig:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # Build query for all name variations
+            # Build parameterized query for all name variations 
+            # Note: This is safe SQL construction - placeholders are created dynamically
+            # but all actual values are bound as parameters to prevent injection
             placeholders = ','.join(['?' for _ in name_variations])
-            query = f"""
+            
+            # Parameterized SQL query - all user input is bound as parameters
+            query = """
                 SELECT DISTINCT 
                     p.external_id as id,
                     p.name,
@@ -143,9 +147,9 @@ class UniversalApiConfig:
                     OR p.name LIKE ?
                 )
                 ORDER BY p.name, p.position
-            """
+            """.format(placeholders=placeholders)
             
-            # Prepare parameters (removed sport filter since there's no sport column)
+            # All parameters are safely bound - no SQL injection risk
             params = name_variations + [f"%{name_variations[0]}%", f"{name_variations[0]}%"]
             
             cursor.execute(query, params)
@@ -243,7 +247,7 @@ def get_player_stats(player_id, season):
     """Get player statistics for a specific season (NFL-specific endpoint)"""
     url = f'https://nfl-api-data.p.rapidapi.com/player-stats/{player_id}'
     params = {'season': season}
-    response = requests.get(url, headers=HEADERS, params=params)
+    response = requests.get(url, headers=HEADERS, params=params, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -251,7 +255,7 @@ def get_player_gamelog(player_id):
     """Get detailed game-by-game statistics for a player (NFL-specific endpoint)"""
     url = f'https://nfl-api-data.p.rapidapi.com/nfl-ath-gamelog'
     params = {'id': player_id}
-    response = requests.get(url, headers=HEADERS, params=params)
+    response = requests.get(url, headers=HEADERS, params=params, timeout=30)
     response.raise_for_status()
     return response.json()
 
