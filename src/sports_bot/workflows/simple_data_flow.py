@@ -108,3 +108,4 @@ class SimpleLangGraphConnector:
             print(f"⚠️ **Partial Data**: Some data sources failed")
         
         return result
+
