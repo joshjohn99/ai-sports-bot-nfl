@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from typing import Type
 from langchain.callbacks.manager import CallbackManagerForToolRun
 from .endpoints import ENDPOINTS, API_CONFIG
-from ..config.api_config import api_config
+from ..config.api_config import api_config, HEADERS
 from ..cache.shared_cache import sports_cache as shared_cache
 
 logger = get_logger(__name__)
@@ -72,7 +72,7 @@ class PlayerStatsTool(BaseTool):
             
             # Fetch from API
             endpoint = get_endpoint_url('PlayerStats', player_id=player_id, season=season)
-            headers = {'Ocp-Apim-Subscription-Key': api_config.api_key}
+            headers = HEADERS
             
             response = requests.get(endpoint, headers=headers, timeout=30)
             response.raise_for_status()
@@ -124,7 +124,7 @@ class PlayerSearchTool(BaseTool):
             # Fetch from API - this would need to be implemented based on your search endpoint
             # For now, return a placeholder structure
             endpoint = get_endpoint_url('PlayerSearch', name=player_name, sport=sport)
-            headers = {'Ocp-Apim-Subscription-Key': api_config.api_key}
+            headers = HEADERS
             
             response = requests.get(endpoint, headers=headers, timeout=30)
             response.raise_for_status()
@@ -179,7 +179,7 @@ class LeagueLeadersTool(BaseTool):
             # This would fetch from your actual leaderboard endpoint
             # Implementation depends on your API structure
             endpoint = get_endpoint_url('LeagueLeaders', stat=stat_category, season=season, limit=limit)
-            headers = {'Ocp-Apim-Subscription-Key': api_config.api_key}
+            headers = HEADERS
             
             response = requests.get(endpoint, headers=headers, timeout=30)
             response.raise_for_status()
