@@ -147,6 +147,11 @@ export function SportsCarousel({
     onSelect()
     emblaApi.on('select', onSelect)
     emblaApi.on('reInit', onSelect)
+
+    return () => {
+      emblaApi.off('select', onSelect)
+      emblaApi.off('reInit', onSelect)
+    }
   }, [emblaApi, onSelect])
 
   useEffect(() => {
@@ -232,22 +237,30 @@ function PlayerCard({
   metric
 }: { 
   player: Player
-  rank: number
-  sport: string
-  metric: string
 }) {
-  // Get primary stat value based on metric and sport
   const getPrimaryStatValue = () => {
-    if (!player.stats) return 0
-    
+    if (!player.stats) return 0;
+
     const statMap: Record<string, keyof PlayerStats> = {
       // NFL
-      'yards': sport === 'NFL' ? 'passing_yards' : 'rushing_yards',
-      'touchdowns': sport === 'NFL' ? 'passing_touchdowns' : 'rushing_touchdowns',
+      'yards': sport === 'NFL'
+        ? (player.position === 'QB'
+            ? 'passing_yards'
+            : player.position === 'RB'
+              ? 'rushing_yards'
+              : 'receiving_yards')
+        : 'points',
+      'touchdowns': sport === 'NFL'
+        ? (player.position === 'QB'
+            ? 'passing_touchdowns'
+            : player.position === 'RB'
+              ? 'rushing_touchdowns'
+              : 'receiving_touchdowns')
+        : 'points',
       'sacks': 'sacks',
       'tackles': 'tackles',
       'interceptions': 'interceptions',
-      
+
       // NBA
       'points': 'points',
       'rebounds': 'rebounds',
@@ -255,7 +268,7 @@ function PlayerCard({
       'steals': 'steals',
       'blocks': 'blocks'
     }
-    
+
     const statKey = statMap[metric] || 'passing_yards'
     return player.stats[statKey] || 0
   }
@@ -308,7 +321,17 @@ function PlayerCard({
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-6xl font-bold text-gray-300">
-              {player.name.split(' ').map(n => n[0]).join('')}
+              {/* Defensive initials generation */}
+              {(() => {
+                if (!player.name || typeof player.name !== 'string') return '?';
+                const parts = player.name.trim().split(/\s+/).filter(Boolean);
+                if (parts.length === 0) return '?';
+                if (parts.length === 1) return parts[0][0]?.toUpperCase() || '?';
+                // For multi-part names, use first char of first and last part
+                const first = parts[0][0]?.toUpperCase() || '';
+                const last = parts[parts.length - 1][0]?.toUpperCase() || '';
+                return (first + last) || '?';
+              })()}
             </div>
           </div>
         )}
