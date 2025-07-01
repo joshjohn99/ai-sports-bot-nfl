@@ -1,0 +1,29 @@
+{
+  "name": "ai-sports-bot-frontend",
+  "version": "2.0.0",
+  "description": "AI Sports Bot Frontend with React components",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "frontend-only": "next dev",
+    "backend": "python working_backend.py",
+    "full-stack": "concurrently \"npm run backend\" \"npm run dev\""
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "embla-carousel-react": "^8.0.0",
+    "lucide-react": "^0.300.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.0.0",
+    "tailwindcss": "^3.3.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0",
+    "concurrently": "^8.2.0"
+  }
+}
