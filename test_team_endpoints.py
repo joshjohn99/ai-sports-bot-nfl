@@ -25,11 +25,11 @@ def test_team_endpoints():
     
     headers = {
         'X-RapidAPI-Key': api_key,
-        'X-RapidAPI-Host': 'nba-api-free-data.p.rapidapi.com'
+        'X-RapidAPI-Host': 'nba-api-data.p.rapidapi.com'
     }
-    
+
     # Test just one division first
-    test_url = 'https://nba-api-free-data.p.rapidapi.com/nba-atlantic-team-list'
+    test_url = 'https://nba-api-data.p.rapidapi.com/nba-atlantic-team-list'
     
     console.print(f"[bold blue]Testing: {test_url}[/bold blue]")
     

@@ -26,14 +26,14 @@ def test_nba_api():
     
     headers = {
         'X-RapidAPI-Key': api_key,
-        'X-RapidAPI-Host': 'nba-api-free-data.p.rapidapi.com'
+        'X-RapidAPI-Host': 'nba-api-data.p.rapidapi.com'
     }
     
     # Test URLs
     test_urls = [
-        'https://nba-api-free-data.p.rapidapi.com/nba-atlantic-team-list',
-        'https://nba-api-free-data.p.rapidapi.com/nba-central-team-list',
-        'https://nba-api-free-data.p.rapidapi.com/nba-player-stats?playerid=4869342'
+        'https://nba-api-data.p.rapidapi.com/nba-atlantic-team-list',
+        'https://nba-api-data.p.rapidapi.com/nba-central-team-list',
+        'https://nba-api-data.p.rapidapi.com/nba-player-stats?playerid=4869342'
     ]
     
     for url in test_urls:

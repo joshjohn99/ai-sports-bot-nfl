@@ -282,7 +282,7 @@ legacy_api_config = {
         }
     },
     'NBA': {
-        'base_url': 'https://nba-api-free-data.p.rapidapi.com/',
+        'base_url': 'https://nba-api-data.p.rapidapi.com/',
         'endpoints': {
             # Player endpoints - corrected based on user feedback
             'PlayerInfo': 'nba-player-info',                # Expects ?playerid={player_id}
@@ -306,7 +306,7 @@ legacy_api_config = {
         },
         'headers': {
             'X-RapidAPI-Key': RAPIDAPI_KEY,
-            'X-RapidAPI-Host': 'nba-api-free-data.p.rapidapi.com'
+            'X-RapidAPI-Host': 'nba-api-data.p.rapidapi.com'
         }
     }
 }
