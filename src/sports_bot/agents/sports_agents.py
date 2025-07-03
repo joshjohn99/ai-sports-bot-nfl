@@ -784,59 +784,11 @@ def main():
                     # Decide how to print player_stats_data; it could be large
                     console.print(player_stats_data) # This might be too verbose; consider summarizing or using Syntax
 
-            # The debate part seems like a separate flow, ensure it doesn't error if player_stats_data is None
-            # This specific debate demo is tied to a very specific question.
-            if current_query_context and current_query_context.question == "Who's the best 3-point shooter in NBA history?":
-                console.print("[magenta]--- Mock Debate Logic ---[/magenta]")
-                playerA_stats_mock = {
-                    'name': 'Stephen Curry',
-                    'stats': {'3pt_made': 3500, '3pt_percentage': 43, 'clutch_3pt': 60}
-                }
-                playerB_stats_mock = {
-                    'name': 'Damian Lillard',
-                    'stats': {'3pt_made': 2500, '3pt_percentage': 38, 'clutch_3pt': 80}
-                }
-                debate_result_data = integrate_queryplanner_to_debate(current_query_context, playerA_stats_mock, playerB_stats_mock)
-                console.print("[bold blue]\n🔥 Template Debate Output:[/bold blue]")
-                console.print(debate_result_data['main_argument'])
-                for counter in debate_result_data['counterarguments']:
-                    console.print(Text(f"  • {counter}", style="blue"))
-                console.print(f"[bold blue]🔥 Controversy Score:[/bold blue] {debate_result_data['controversy_score']}")
-            elif current_query_context.question != "Who's the best 3-point shooter in NBA history?" and debate_result_data is not None:
-                 debate_result_data = None 
 
         except Exception as e:
             console.print(f"[bold red]Error processing your query: {e}[/bold red]")
             console.print_exception(show_locals=True)
 
-    # Only run dynamic debate if the debate_result_data was populated
-    if debate_result_data: 
-        console.print("[magenta]--- Dynamic Debate Logic (LLM) ---[/magenta]")
-        playerA_stats_dynamic_mock = {
-            'name': 'Stephen Curry',
-            'stats': {'3pt_made': 3500, '3pt_percentage': 43, 'clutch_3pt': 60}
-        }
-        playerB_stats_dynamic_mock = {
-            'name': 'Damian Lillard',
-            'stats': {'3pt_made': 2500, '3pt_percentage': 38, 'clutch_3pt': 80}
-        }
-        evidence_list_dynamic_mock = [
-            {'stat': '3pt_made', 'value': 3500},
-            {'stat': '3pt_percentage', 'value': 43},
-            {'stat': 'clutch_3pt', 'value': 60}
-        ]
-        dynamic_debate_query_context = QueryContext(
-            question="Dynamic debate on 3-point shooters", 
-            stat_type="3-point shooting prowess"
-        )
-        dynamic_debate = llm_agent.generate_dynamic_debate(
-            playerA_stats_dynamic_mock,
-            playerB_stats_dynamic_mock,
-            evidence_list_dynamic_mock,
-            dynamic_debate_query_context.stat_type
-        )
-        console.print("[bold blue]\n🔥 Dynamic Debate Output (LLM):[/bold blue]")
-        console.print(dynamic_debate)
 
 if __name__ == "__main__":
     main()
