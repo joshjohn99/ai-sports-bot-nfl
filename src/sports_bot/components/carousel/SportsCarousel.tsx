@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
-import { AlertCircle, TrendingUp, Trophy, Target, ChevronLeft, ChevronRight } from 'lucide-react'
+import { AlertCircle, Target, ChevronLeft, ChevronRight } from 'lucide-react'
 
 // TypeScript interfaces matching your backend models
 interface PlayerStats {
@@ -119,9 +119,7 @@ export function SportsCarousel({
     } catch (err) {
       console.error('Error fetching players:', err)
       setError(err instanceof Error ? err.message : 'Failed to load players')
-      
-      // Fallback to sample data for development
-      setPlayers(getSamplePlayers(sport))
+      setPlayers([])
     } finally {
       setLoading(false)
     }
@@ -419,43 +417,4 @@ function CarouselSkeleton() {
       </div>
     </div>
   )
-}
-
-function getSamplePlayers(sport: string): Player[] {
-  // Fallback sample data for development
-  const samples = {
-    'NFL': [
-      {
-        id: 1,
-        external_id: '1',
-        name: 'Patrick Mahomes',
-        position: 'QB',
-        sport: 'NFL',
-        current_team: { id: 1, name: 'Kansas City Chiefs', display_name: 'Chiefs', abbreviation: 'KC' },
-        stats: { passing_yards: 4183, passing_touchdowns: 27, games_played: 17 }
-      },
-      {
-        id: 2,
-        external_id: '2',
-        name: 'Josh Allen',
-        position: 'QB',
-        sport: 'NFL',
-        current_team: { id: 2, name: 'Buffalo Bills', display_name: 'Bills', abbreviation: 'BUF' },
-        stats: { passing_yards: 4306, passing_touchdowns: 29, games_played: 17 }
-      }
-    ],
-    'NBA': [
-      {
-        id: 1,
-        external_id: '1',
-        name: 'LeBron James',
-        position: 'SF',
-        sport: 'NBA',
-        current_team: { id: 1, name: 'Los Angeles Lakers', display_name: 'Lakers', abbreviation: 'LAL' },
-        stats: { points: 25, rebounds: 7, assists: 8, games_played: 55 }
-      }
-    ]
-  }
-  
-  return samples[sport as keyof typeof samples] || []
 }
