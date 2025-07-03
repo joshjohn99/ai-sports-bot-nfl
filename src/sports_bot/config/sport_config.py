@@ -163,9 +163,9 @@ class SportConfigManager:
             },
             season_format="YYYY",
             api_endpoints={
-                "player_stats": "/nfl-player-stats/v1/data",
-                "team_roster": "/nfl-player-listing/v1/data",
-                "league_leaders": "/nfl-league-leaders/v1/data",
+                "player_stats": "/nfl-player-stats",
+                "team_roster": "/nfl-players-list",
+                "league_leaders": "/nfl-league-leaders",
             }
         )
     
@@ -251,9 +251,12 @@ class SportConfigManager:
             },
             season_format="YYYY-YY",
             api_endpoints={
-                "player_stats": "/nba-player-stats/v1/data",
-                "team_roster": "/nba-player-listing/v1/data",
-                "league_leaders": "/nba-league-leaders/v1/data",
+                "player_stats": "/nba-player-stats",
+                "team_roster": "/nba-players-list",
+                "players_list": "/nba-players-list",
+                "games_by_date": "/nba-games-by-date",
+                "game_details": "/nba-game-details",
+                "league_leaders": "/nba-league-leaders",
             }
         )
     
