@@ -27,3 +27,4 @@ uvicorn>=0.23.0
 sqlalchemy>=2.0.0
 schedule>=1.2.0
 backoff>=2.2.0 
+rich>=13.0.0
