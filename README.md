@@ -57,7 +57,7 @@ An intelligent conversational AI system for NFL sports statistics, player analys
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/ai-sports-bot-nfl.git
+   git clone https://github.com/ai-sports-bot/ai-sports-bot-nfl.git
    cd ai-sports-bot-nfl
    ```
 
@@ -247,9 +247,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/ai-sports-bot-nfl/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/ai-sports-bot-nfl/discussions)
-- **Documentation**: [Project Wiki](https://github.com/yourusername/ai-sports-bot-nfl/wiki)
+- **Issues**: [GitHub Issues](https://github.com/ai-sports-bot/ai-sports-bot-nfl/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ai-sports-bot/ai-sports-bot-nfl/discussions)
+- **Documentation**: [Project Wiki](https://github.com/ai-sports-bot/ai-sports-bot-nfl/wiki)
 
 ---
 
