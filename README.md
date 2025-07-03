@@ -71,6 +71,8 @@ An intelligent conversational AI system for NFL sports statistics, player analys
    ```bash
    pip install -r requirements.txt
    ```
+   This installs all required libraries, including the `rich` package for
+   colorful console output.
 
 4. **Set up environment variables**
    ```bash
