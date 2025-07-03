@@ -22,10 +22,25 @@ RAPIDAPI_KEY = os.getenv('RAPIDAPI_KEY')
 if not RAPIDAPI_KEY:
     raise ValueError("Missing RapidAPI credentials. Please set RAPIDAPI_KEY in your .env file")
 
-HEADERS = {
-    'X-RapidAPI-Key': RAPIDAPI_KEY,
-    'X-RapidAPI-Host': 'nfl-api-data.p.rapidapi.com'
+# Mapping of supported sports to their RapidAPI hosts
+RAPIDAPI_HOSTS = {
+    'NFL': 'nfl-api-data.p.rapidapi.com',
+    'NBA': 'nba-api-data.p.rapidapi.com',
+    'MLB': 'mlb-api-data.p.rapidapi.com',
+    'NHL': 'nhl-api-data.p.rapidapi.com',
 }
+
+
+def get_headers(sport: str = 'NFL') -> Dict[str, str]:
+    """Return request headers with the host for the given sport."""
+    host = RAPIDAPI_HOSTS.get(sport.upper(), RAPIDAPI_HOSTS['NFL'])
+    return {
+        'X-RapidAPI-Key': RAPIDAPI_KEY,
+        'X-RapidAPI-Host': host,
+    }
+
+# Default headers using NFL as the sport for backward compatibility
+HEADERS = get_headers('NFL')
 
 class UniversalApiConfig:
     """Universal API configuration for all sports."""
@@ -243,19 +258,29 @@ def get_player_id(player_name: str,
         season_context=season_context
     )
 
-def get_player_stats(player_id, season):
-    """Get player statistics for a specific season (NFL-specific endpoint)"""
+def get_player_stats(player_id: str, season: str, sport: str = 'NFL'):
+    """Get player statistics for a specific season."""
     url = f'https://nfl-api-data.p.rapidapi.com/player-stats/{player_id}'
     params = {'season': season}
-    response = requests.get(url, headers=HEADERS, params=params, timeout=30)
+    response = requests.get(
+        url,
+        headers=get_headers(sport),
+        params=params,
+        timeout=30,
+    )
     response.raise_for_status()
     return response.json()
 
-def get_player_gamelog(player_id):
-    """Get detailed game-by-game statistics for a player (NFL-specific endpoint)"""
+def get_player_gamelog(player_id: str, sport: str = 'NFL'):
+    """Get detailed game-by-game statistics for a player."""
     url = f'https://nfl-api-data.p.rapidapi.com/nfl-ath-gamelog'
     params = {'id': player_id}
-    response = requests.get(url, headers=HEADERS, params=params, timeout=30)
+    response = requests.get(
+        url,
+        headers=get_headers(sport),
+        params=params,
+        timeout=30,
+    )
     response.raise_for_status()
     return response.json()
 
@@ -276,10 +301,7 @@ legacy_api_config = {
             'GameSchedule': 'games',
             'Teams': 'teams' 
         },
-        'headers': {
-            'X-RapidAPI-Key': RAPIDAPI_KEY,
-            'X-RapidAPI-Host': 'nfl-api-data.p.rapidapi.com'
-        }
+        'headers': get_headers('NFL')
     },
     'NBA': {
         'base_url': 'https://nba-api-data.p.rapidapi.com/',
@@ -304,9 +326,6 @@ legacy_api_config = {
             'GameSchedule': 'nba-games',                    # NBA game schedule
             'PlayerGamelog': 'nba-player-gamelog',          # Expects ?playerid={player_id}
         },
-        'headers': {
-            'X-RapidAPI-Key': RAPIDAPI_KEY,
-            'X-RapidAPI-Host': 'nba-api-data.p.rapidapi.com'
-        }
+        'headers': get_headers('NBA')
     }
 }
