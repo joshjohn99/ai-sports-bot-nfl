@@ -5,7 +5,7 @@ Thank you for your interest in contributing to the AI Sports Bot NFL project! Th
 ## 🎯 How to Contribute
 
 ### Reporting Issues
-- Use the [GitHub Issues](https://github.com/yourusername/ai-sports-bot-nfl/issues) page
+- Use the [GitHub Issues](https://github.com/ai-sports-bot/ai-sports-bot-nfl/issues) page
 - Search existing issues before creating a new one
 - Provide detailed information including:
   - Steps to reproduce
@@ -14,7 +14,7 @@ Thank you for your interest in contributing to the AI Sports Bot NFL project! Th
   - Error messages or logs
 
 ### Suggesting Features
-- Open a [GitHub Discussion](https://github.com/yourusername/ai-sports-bot-nfl/discussions)
+- Open a [GitHub Discussion](https://github.com/ai-sports-bot/ai-sports-bot-nfl/discussions)
 - Explain the use case and benefits
 - Consider implementation complexity
 - Check if it aligns with project goals
@@ -23,7 +23,7 @@ Thank you for your interest in contributing to the AI Sports Bot NFL project! Th
 
 #### 1. Fork and Clone
 ```bash
-git clone https://github.com/yourusername/ai-sports-bot-nfl.git
+git clone https://github.com/ai-sports-bot/ai-sports-bot-nfl.git
 cd ai-sports-bot-nfl
 ```
 
@@ -234,7 +234,7 @@ refactor: improve caching efficiency
 ## 📚 Resources
 
 ### Documentation
-- [Project Wiki](https://github.com/yourusername/ai-sports-bot-nfl/wiki)
+- [Project Wiki](https://github.com/ai-sports-bot/ai-sports-bot-nfl/wiki)
 - [Architecture Overview](docs/architecture/)
 - [API Documentation](docs/api/)
 
