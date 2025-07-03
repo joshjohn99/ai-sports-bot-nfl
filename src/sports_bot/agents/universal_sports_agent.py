@@ -50,6 +50,9 @@ from rich.text import Text
 
 console = Console()
 
+# Import planners and processors from the core sports agent
+from .sports_agents import run_query_planner, run_enhanced_query_processor, QueryContext
+
 class SportDetectionConfidence(Enum):
     """Confidence levels for sport detection"""
     CERTAIN = 0.9
@@ -606,28 +609,37 @@ class UniversalSportsAgent:
             return state
         
         return simple_workflow
-
     def _execute_single_sport_query(self, sport: str, query: str, entities: Dict[str, List[str]], metrics: List[str]) -> Dict[str, Any]:
-        """Execute a query for a single sport"""
+        """Execute a query for a single sport using real data retrieval"""
         try:
-            # For now, return a mock response
-            # In a real implementation, this would route to the appropriate sport-specific system
+            context: QueryContext = asyncio.run(run_query_planner(query))
+            context.sport = sport
+            if entities.get("players"):
+                context.player_names = entities["players"]
+            if entities.get("teams"):
+                context.team_names = entities["teams"]
+            if metrics:
+                context.metrics_needed = metrics
+            results = asyncio.run(run_enhanced_query_processor(query, context))
+            status = "error" if isinstance(results, dict) and results.get("error") else "success"
             return {
-                "status": "success",
+                "status": status,
                 "sport": sport,
                 "query": query,
-                "message": f"Successfully processed {sport} query",
+                "message": f"Successfully processed {sport} query" if status == "success" else results.get("error", ""),
                 "entities": entities,
-                "metrics": metrics
+                "metrics": metrics,
+                "results": results,
             }
-            
         except Exception as e:
             return {
                 "status": "error",
                 "sport": sport,
                 "error": str(e),
-                "message": f"Failed to process {sport} query"
+                "message": f"Failed to process {sport} query",
             }
+
+
 
     def _format_error_response(self, error_data: Dict[str, Any]) -> str:
         """Format error response"""
