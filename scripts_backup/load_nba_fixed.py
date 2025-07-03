@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NBA Data Loader using NBA API Free Data (nba-api-free-data.p.rapidapi.com)
+NBA Data Loader using NBA API (nba-api-data.p.rapidapi.com)
 Follows the correct API pattern: divisions -> teams -> players -> player stats
 """
 
@@ -31,10 +31,10 @@ class NBAFreeDataLoader:
     def __init__(self):
         self.api_key = os.getenv('RAPIDAPI_KEY')
         self.console = Console()
-        self.base_url = "https://nba-api-free-data.p.rapidapi.com"
+        self.base_url = "https://nba-api-data.p.rapidapi.com"
         self.headers = {
             'X-RapidAPI-Key': self.api_key,
-            'X-RapidAPI-Host': 'nba-api-free-data.p.rapidapi.com'
+            'X-RapidAPI-Host': 'nba-api-data.p.rapidapi.com'
         }
         
         # NBA divisions - CORRECTED URLs (all follow same pattern as atlantic)

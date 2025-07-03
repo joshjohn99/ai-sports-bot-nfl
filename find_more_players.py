@@ -17,7 +17,7 @@ def find_player_ids():
     api_key = os.getenv('RAPIDAPI_KEY')
     headers = {
         'X-RapidAPI-Key': api_key,
-        'X-RapidAPI-Host': 'nba-api-free-data.p.rapidapi.com'
+        'X-RapidAPI-Host': 'nba-api-data.p.rapidapi.com'
     }
     
     # Let's try some common player ID ranges based on your working ID (4869342)
@@ -38,7 +38,7 @@ def find_player_ids():
     
     for player_id in test_ids:
         try:
-            url = f"https://nba-api-free-data.p.rapidapi.com/nba-player-stats"
+            url = f"https://nba-api-data.p.rapidapi.com/nba-player-stats"
             params = {'playerid': player_id}
             
             response = requests.get(url, headers=headers, params=params, timeout=10)

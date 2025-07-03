@@ -211,9 +211,18 @@ class SportRegistry:
             api_config={
                 "base_url": "https://nba-api-data.p.rapidapi.com",
                 "endpoints": {
-                    "AllTeams": "/teams",
-                    "PlayerStats": "/player-stats",
-                    "TeamRoster": "/team-roster"
+                    "PlayerInfo": "/nba-player-info",
+                    "PlayerStats": "/nba-player-stats",
+                    "PlayerStatsSummary": "/nba-player-stats-summary",
+                    "PlayersByTeam": "/nba-player-list",
+                    "TeamInfo": "/nba-team-info",
+                    "TeamStats": "/nba-team-stats",
+                    "AllTeams": "/nba-teams",
+                    "TeamsList": "/nba-team-list",
+                    "LeagueInfo": "/nba-league-info",
+                    "Standings": "/nba-standings",
+                    "GameSchedule": "/nba-games",
+                    "PlayerGamelog": "/nba-player-gamelog",
                 },
                 "headers": {
                     "X-RapidAPI-Host": "nba-api-data.p.rapidapi.com"

@@ -88,10 +88,10 @@ class NBADataFetcher:
                 'headers': {}  # No auth required
             },
             'nba_free_data': {
-                'base_url': 'https://nba-api-free-data.p.rapidapi.com',
+                'base_url': 'https://nba-api-data.p.rapidapi.com',
                 'headers': {
                     'X-RapidAPI-Key': self.rapidapi_key,
-                    'X-RapidAPI-Host': 'nba-api-free-data.p.rapidapi.com'
+                    'X-RapidAPI-Host': 'nba-api-data.p.rapidapi.com'
                 }
             }
         }

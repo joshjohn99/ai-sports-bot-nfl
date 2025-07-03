@@ -51,10 +51,10 @@ class LangGraphNBALoader:
     def __init__(self):
         self.api_key = os.getenv('RAPIDAPI_KEY')
         self.openai_key = os.getenv('OPENAI_API_KEY')
-        self.base_url = "https://nba-api-free-data.p.rapidapi.com"
+        self.base_url = "https://nba-api-data.p.rapidapi.com"
         self.headers = {
             'X-RapidAPI-Key': self.api_key,
-            'X-RapidAPI-Host': 'nba-api-free-data.p.rapidapi.com'
+            'X-RapidAPI-Host': 'nba-api-data.p.rapidapi.com'
         }
         
         # Initialize LangChain components
