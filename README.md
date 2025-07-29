@@ -110,6 +110,25 @@ async with DebateAgent(api_key="your_api_key") as agent:
     ))
 ```
 
+### Player Lookup Example
+
+```python
+from sports_bot.data.fetcher import NFLDataFetcher
+from sports_bot.data.response_formatter import ResponseFormatter
+from sports_bot.data.player_lookup import PlayerLookup
+
+fetcher = NFLDataFetcher(api_key="your_api_key")
+formatter = ResponseFormatter()
+lookup = PlayerLookup(fetcher, formatter)
+
+# Simple one-off call (context handled internally)
+player = await lookup.lookup_player_stats("Kyler Murray")
+
+# For multiple requests reuse the fetcher context
+async with fetcher:
+    comparison = await lookup.compare_players("Kyler Murray", "Josh Allen")
+```
+
 ## Contributing
 
 1. Fork the repository
