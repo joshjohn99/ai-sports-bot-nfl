@@ -5,19 +5,9 @@ Handles NFL queries with cardinality awareness without external dependencies
 """
 
 import json
-import sys
 import asyncio
 import os
 from typing import Dict, Any, List, Optional
-
-# Add the project root to the Python path for database imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.join(current_dir, '..', '..', '..', '..')
-sys.path.insert(0, project_root)
-
-# Import database modules
-from src.sports_bot.database.sport_models import sport_db_manager
-from src.sports_bot.database.player_lookup_sql import SQLPlayerLookup, create_sql_lookup_for_sport
 
 class SimpleNFLAgent:
     """Simplified NFL agent for LangChain bridge testing"""
@@ -28,11 +18,8 @@ class SimpleNFLAgent:
             'Statistical analysis',
             'Team evaluations', 
             'Cardinality-aware processing',
-            'Intelligent query routing',
-            'SQL-based player lookup'
+            'Intelligent query routing'
         ]
-        # Initialize SQL lookup for NFL
-        self.sql_lookup = create_sql_lookup_for_sport('NFL', sport_db_manager)
     
     async def handle_intelligent_debate(self, context_data: dict) -> dict:
         """Handle intelligent debate generation with cardinality awareness"""
@@ -451,7 +438,7 @@ Try asking about:
         }
 
     async def _generate_player_performance_analysis(self, query: str, query_lower: str) -> dict:
-        """Generate intelligent player performance analysis with SQL-based disambiguation"""
+        """Generate intelligent player performance analysis"""
         
         # Extract player name from query
         player_name = self._extract_player_name_from_query(query_lower)
@@ -461,8 +448,9 @@ Try asking about:
         # Determine expected position from query context
         expected_position = self._determine_expected_position(query_lower)
         
-        # Get player data with SQL-based disambiguation
-        player_data = await self._get_player_with_sql_disambiguation(player_name, expected_position)
+        # Get player data using local simulation
+        players = self._get_players_by_name_simulation(player_name)
+        player_data = self._disambiguate_players(players, expected_position)
         
         if not player_data:
             return self._generate_player_not_found_response(query, player_name)
@@ -541,37 +529,6 @@ Try asking about:
         # Default to offense for player queries
         return 'offense'
     
-    async def _get_player_with_sql_disambiguation(self, player_name: str, expected_position: str = None) -> dict:
-        """Get player data using real SQL-based disambiguation"""
-        
-        if not self.sql_lookup:
-            # Fallback to simulation if SQL lookup is not available
-            return self._get_players_by_name_simulation(player_name)[0] if self._get_players_by_name_simulation(player_name) else None
-        
-        try:
-            # Use real SQL lookup
-            player_data = self.sql_lookup.find_player_by_name_sql(
-                player_name=player_name,
-                expected_position=expected_position
-            )
-            
-            if not player_data:
-                return None
-            
-            # Get player stats if available
-            if player_data.get('id'):
-                player_with_stats = self.sql_lookup.get_player_with_stats_sql(
-                    player_id=player_data['id']
-                )
-                if player_with_stats:
-                    return player_with_stats
-            
-            return player_data
-            
-        except Exception as e:
-            print(f"Error in SQL player lookup: {e}")
-            # Fallback to simulation
-            return self._get_players_by_name_simulation(player_name)[0] if self._get_players_by_name_simulation(player_name) else None
     
     def _get_players_by_name_simulation(self, player_name: str) -> list:
         """Simulate SQL query for players with same name"""
