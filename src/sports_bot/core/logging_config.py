@@ -4,6 +4,7 @@ Logging configuration for the sports bot.
 
 import logging
 import sys
+from datetime import datetime
 from typing import Optional
 
 def setup_logging(
