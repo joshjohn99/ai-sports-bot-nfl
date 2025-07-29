@@ -333,6 +333,26 @@ class NFLDataFetcher:
         """
         return await self._cached_request("nfl-team-roster", {"id": team_id})
 
+    async def get_players(self, team_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get a list of NFL players.
+
+        This endpoint can optionally be filtered by team using the team ID.
+
+        Args:
+            team_id: If provided, return only players for the given team.
+
+        Returns:
+            List of player objects. Each object includes at minimum ``id`` and
+            ``fullName`` fields. An empty list is returned if the response does
+            not match the expected format.
+        """
+        params = {"team": team_id} if team_id else None
+        data = await self._cached_request("nfl-player-listing", params)
+        if not isinstance(data, list):
+            logger.error("Unexpected response format from player listing endpoint")
+            return []
+        return data
+
     def extract_player_id(self, player_data: Dict[str, Any]) -> Optional[str]:
         """
         Extract player ID from player data object.
@@ -383,6 +403,26 @@ class NFLDataFetcher:
             ```
         """
         return await self._cached_request("nfl-player-info/v1/data", {"id": player_id})
+
+    async def get_player_stats(self, player_id: str, season: Optional[str] = None) -> Dict[str, Any]:
+        """Get statistics for a specific player.
+
+        Args:
+            player_id: Identifier of the player to retrieve stats for.
+            season: Optional season string (e.g. ``"2023"``) to filter the stats.
+
+        Returns:
+            Dictionary of player statistics or an empty dict if the request
+            fails or the response format is unexpected.
+        """
+        params = {"id": player_id}
+        if season:
+            params["season"] = season
+        data = await self._cached_request("nfl-player-stats", params)
+        if not isinstance(data, dict):
+            logger.error("Unexpected response format from player stats endpoint")
+            return {}
+        return data
 
     async def get_team_stats(self, team_id: str) -> Dict[str, Any]:
         """

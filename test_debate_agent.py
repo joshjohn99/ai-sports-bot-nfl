@@ -66,6 +66,16 @@ async def test_get_team_roster(fetcher):
         assert "lastName" in player
 
 @pytest.mark.asyncio
+async def test_get_players(fetcher):
+    """Test retrieving player listing."""
+    async with fetcher:
+        players = await fetcher.get_players()
+        assert isinstance(players, list)
+        if players:
+            assert "id" in players[0]
+            assert "fullName" in players[0]
+
+@pytest.mark.asyncio
 async def test_get_player_info(fetcher):
     """Test getting player info."""
     async with fetcher:
