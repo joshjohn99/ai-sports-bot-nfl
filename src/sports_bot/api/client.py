@@ -23,7 +23,7 @@ def get_endpoint_url(endpoint_type: str, **kwargs) -> str:
     Construct endpoint URL based on type and parameters.
     This is a placeholder implementation - you should replace with your actual URL construction logic.
     """
-    base_url = API_CONFIG.get('base_url', 'https://api.example.com/')
+    base_url = API_CONFIG.get('base_url', 'https://nfl-api-data.p.rapidapi.com/')
     
     # This is a simplified implementation
     # You should replace this with your actual endpoint construction logic

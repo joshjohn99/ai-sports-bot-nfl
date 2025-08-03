@@ -60,10 +60,10 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/ai-sports-bot-nfl"
-Documentation = "https://github.com/yourusername/ai-sports-bot-nfl/wiki"
-Repository = "https://github.com/yourusername/ai-sports-bot-nfl"
-Issues = "https://github.com/yourusername/ai-sports-bot-nfl/issues"
+Homepage = "https://github.com/ai-sports-bot/ai-sports-bot-nfl"
+Documentation = "https://github.com/ai-sports-bot/ai-sports-bot-nfl/wiki"
+Repository = "https://github.com/ai-sports-bot/ai-sports-bot-nfl"
+Issues = "https://github.com/ai-sports-bot/ai-sports-bot-nfl/issues"
 
 [project.scripts]
 sports-bot = "sports_bot.main:main"

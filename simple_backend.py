@@ -40,55 +40,58 @@ async def health_check():
     return {"status": "healthy", "version": "2.0.0-simple"}
 
 @app.get("/api/league-leaders")
-async def get_league_leaders(sport: str = "NFL", metric: str = "yards", limit: int = 10):
-    """Simple mock data for testing"""
-    sample_players = [
-        {
-            'id': 1,
-            'external_id': '1',
-            'name': 'Patrick Mahomes',
-            'position': 'QB',
-            'sport': 'NFL',
-            'current_team': {
-                'id': 1,
-                'name': 'Kansas City Chiefs',
-                'display_name': 'Chiefs',
-                'abbreviation': 'KC'
-            },
-            'stats': {
-                'passing_yards': 4183,
-                'passing_touchdowns': 27,
-                'games_played': 17
-            }
-        },
-        {
-            'id': 2,
-            'external_id': '2', 
-            'name': 'Josh Allen',
-            'position': 'QB',
-            'sport': 'NFL',
-            'current_team': {
-                'id': 2,
-                'name': 'Buffalo Bills',
-                'display_name': 'Bills',
-                'abbreviation': 'BUF'
-            },
-            'stats': {
-                'passing_yards': 4306,
-                'passing_touchdowns': 29,
-                'games_played': 17
-            }
+async def get_league_leaders(
+    sport: str = "NFL", metric: str = "yards", limit: int = 10
+):
+    """Return league leaders from the real database."""
+    try:
+        from sports_bot.db.models import db_manager, Player, PlayerStats, Team
+
+        session = db_manager.get_session()
+        query = (
+            session.query(Player, PlayerStats, Team)
+            .join(PlayerStats, Player.id == PlayerStats.player_id)
+            .join(Team, Player.current_team_id == Team.id)
+            .filter(Player.sport == sport)
+        )
+
+        if metric == "yards":
+            query = query.order_by(PlayerStats.passing_yards.desc())
+        elif metric == "sacks":
+            query = query.order_by(PlayerStats.sacks.desc())
+        elif metric == "points":
+            query = query.order_by(PlayerStats.points.desc())
+
+        results = query.limit(limit).all()
+        session.close()
+
+        players = []
+        for player, stats, team in results:
+            players.append({
+                "id": player.id,
+                "name": player.name,
+                "position": player.position,
+                "sport": player.sport,
+                "current_team": {
+                    "name": team.name,
+                    "abbreviation": team.abbreviation,
+                },
+                "stats": {
+                    "passing_yards": stats.passing_yards or 0,
+                    "passing_touchdowns": stats.passing_touchdowns or 0,
+                    "sacks": float(stats.sacks) if stats.sacks else 0.0,
+                    "points": stats.points or 0,
+                    "games_played": stats.games_played or 0,
+                },
+            })
+
+        return {
+            "players": players,
+            "total": len(players),
+            "metadata": {"sport": sport, "metric": metric},
         }
-    ]
-    
-    return {
-        'players': sample_players[:limit],
-        'total': len(sample_players),
-        'metadata': {
-            'sport': sport,
-            'metric': metric
-        }
-    }
+    except Exception as e:
+        return {"error": str(e)}
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
